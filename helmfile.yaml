@@ -4,7 +4,7 @@ repositories:
 - name: grafana
   url: https://grafana.github.io/helm-charts
 # - name: online-boutique       # helm chart não-oficial porém mantido
-#   url: https://raw.githubusercontent.com/GoogleCloudPlatform/microservices-demo/main/helm-chart
+#   url: oci://us-docker.pkg.dev/online-boutique-ci/charts/onlineboutique
 
 releases:
 - name: kube-prometheus-stack
@@ -18,8 +18,9 @@ releases:
   values:
   - adminPassword: "admin"
 
-# - name: online-boutique
-#   namespace: boutique
-#   chart: online-boutique/online-boutique
-#   values: []
+- name: online-boutique
+  namespace: boutique
+  chart: oci://us-docker.pkg.dev/online-boutique-ci/charts/onlineboutique
+  version: 0.10.2
+  values: []
 

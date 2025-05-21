@@ -34,7 +34,23 @@ releases:
   chart: grafana/grafana
   version: 9.0.0
   values:
-  - adminPassword: "admin"
+    - adminPassword: "admin"
+    - ingress:
+        enabled: true
+        ingressClassName: nginx
+        hosts:
+          - grafana.127.0.0.1.nip.io
+        path: /
+        pathType: Prefix
+    - sidecar:
+        datasources:
+          enabled: true
+          label: grafana_datasource
+          searchNamespace: observability
+        dashboards:
+          enabled: true
+          label: grafana_dashboard
+          searchNamespace: observability
 
 - name: online-boutique
   namespace: boutique

@@ -3,6 +3,15 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
   - role: worker
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 30443
+        hostPort: 443
+        protocol: TCP
+    labels:
+      ingress-ready: true
   - role: worker
 networking:
   apiServerAddress: "127.0.0.1"

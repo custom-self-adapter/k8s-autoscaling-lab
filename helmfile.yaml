@@ -30,32 +30,21 @@ releases:
           enabled: true
 
 - name: kube-prometheus-stack
-  namespace: observability
+  namespace: monitoring
   chart: prometheus-community/kube-prometheus-stack
-  version: 72.5.2
-
-- name: grafana-dashboards
-  namespace: observability
-  chart: grafana/grafana
-  version: 9.0.0
+  version: 72.6.2
   values:
-    - adminPassword: "admin"
-    - ingress:
-        enabled: true
-        ingressClassName: nginx
-        hosts:
-          - grafana.127.0.0.1.nip.io
-        path: /
-        pathType: Prefix
-    - sidecar:
-        datasources:
+    - prometheus:
+        prometheusSpec:
+          enableRemoteWriteReceiver: true
+          maximumStartupDurationSeconds: 120
+    - grafana:
+        adminPassword: "admin"
+        ingress:
           enabled: true
-          label: grafana_datasource
-          searchNamespace: observability
-        dashboards:
-          enabled: true
-          label: grafana_dashboard
-          searchNamespace: observability
+          ingressClassName: nginx
+          hosts:
+            - grafana.k8s.lab
 
 - name: online-boutique
   namespace: boutique

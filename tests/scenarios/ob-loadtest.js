@@ -58,17 +58,24 @@ export default function () {
   // 4. alternar moeda
   const currencies = ['USD', 'BRL', 'EUR', 'CAD', 'JPY'];
   http.post(`${BASE}/setCurrency`,
-            JSON.stringify({ currencyCode: currencies[Math.floor(Math.random() * currencies.length)] }),
-            { headers: { 'Content-Type': 'application/json' } });
+            formUrlencoded({ currencyCode: randomItem(currencies) }),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
   // 5. checkout eventual
   if (Math.random() < 0.3) {
-    const payload = JSON.stringify({
-      email: 'someone@example.com',
-      address: { streetAddress: 'Rua A', city: 'Fortaleza', state: 'CE', country: 'Brazil', zipCode: '60000-000' },
-      creditCard: { number: '4111111111111111', cvv: 123, expirationMonth: 1, expirationYear: 2030 }
+    const payload = formUrlencoded({
+      'email': 'someone@example.com',
+      'street_address': 'Rua A',
+      'zip_code': '60000',
+      'city': 'Fortaleza',
+      'state': 'CE',
+      'country': 'Brazil',
+      'credit_card_number': '4111111111111111',
+      'credit_card_cvv': 123,
+      'credit_card_expiration_month': 1,
+      'credit_card_expiration_year': 2030
     });
-    res = http.post(`${BASE}/api/checkout`, payload, { headers: { 'Content-Type': 'application/json' } });
+    res = http.post(`${BASE}/cart/checkout`, payload, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
     check(res, { 'checkout OK': r => r.status >= 200 && r.status < 300 });
   }
 

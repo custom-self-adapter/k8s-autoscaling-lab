@@ -1,5 +1,8 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check, fail, sleep } from 'k6';
+import { parseHTML } from 'k6/html';
+import { randomItem } from 'https://jslib.k6.io/k6-utils/1.6.0/index.js';
+import formUrlencoded from 'https://jslib.k6.io/form-urlencoded/3.0.0/index.js';
 
 export const options = {
   scenarios: {
@@ -30,16 +33,15 @@ export default function () {
   check(res, { 'home OK': r => r.status === 200 });
 
   // obtém um produto aleatório dentro de hot-product-card
-  const doc = res.html();
+  const doc = parseHTML(res.body);
   const links = doc.find('.hot-product-card a');
 
-  if (!links.length) {
-    sleep(2);
-    return;
+  if (!links.size()) {
+    fail('no products found');
   }
 
   const hrefs = links.map((_, el) => el.attr('href'));
-  const href = hrefs.get(Math.floor(Math.random() * hrefs.size()));
+  const href = randomItem(hrefs);
   const prodId = href.split('/').pop();
 
   // 2. página do produto
@@ -48,9 +50,9 @@ export default function () {
   sleep(1);
 
   // 3. adicionar ao carrinho
-  const cartBody = JSON.stringify({ id: prodId, quantity: 1 });
-  res = http.post(`${BASE}/cart`, cartBody, { headers: { 'Content-Type': 'application/json' } });
-  check(res, { 'cart OK': r => r.status === 200 });
+  const cartBody = formUrlencoded({ 'product_id': prodId, 'quantity': 1 });
+  res = http.post(`${BASE}/cart`, cartBody, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  check(res, {'cart OK': r => r.status === 200 });
   sleep(1);
 
   // 4. alternar moeda

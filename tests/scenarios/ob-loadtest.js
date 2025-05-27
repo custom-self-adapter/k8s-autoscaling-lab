@@ -10,11 +10,11 @@ export const options = {
       executor: 'ramping-arrival-rate',
       timeUnit: '1s',
       preAllocatedVUs: 50,
-      maxVUs: 500,
+      maxVUs: 1000,
       stages: [
         { target: 50,  duration: '2m' },
-        { target: 200, duration: '3m' },
-        { target: 400, duration: '5m' },
+        { target: 250, duration: '3m' },
+        { target: 600, duration: '5m' },
         { target: 0,   duration: '1m' }
       ]
     }
@@ -25,7 +25,7 @@ export const options = {
   }
 };
 
-const BASE = __ENV.BASE_URL || 'http://10.0.0.16';
+const BASE = __ENV.BASE_URL || 'http://boutique.k8s.lab';
 
 export default function () {
   // 1. catálogo
@@ -58,7 +58,7 @@ export default function () {
   // 4. alternar moeda
   const currencies = ['USD', 'BRL', 'EUR', 'CAD', 'JPY'];
   http.post(`${BASE}/setCurrency`,
-            formUrlencoded({ currencyCode: randomItem(currencies) }),
+            formUrlencoded({ currency_code: randomItem(currencies) }),
             { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
   // 5. checkout eventual

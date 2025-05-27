@@ -28,6 +28,16 @@ releases:
         ingressClassResource:
           name: nginx
           enabled: true
+        podAnnotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "10254"
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+            additionalLabels:
+              release: kube-prometheus-stack
+            interval: 30s
 
 - name: kube-prometheus-stack
   namespace: monitoring
@@ -35,6 +45,11 @@ releases:
   version: 72.6.2
   values:
     - prometheus:
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            - prometheus.k8s.lab
         prometheusSpec:
           enableRemoteWriteReceiver: true
           maximumStartupDurationSeconds: 120

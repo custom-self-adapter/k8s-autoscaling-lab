@@ -68,7 +68,7 @@ releases:
 
 - name: online-boutique
   namespace: boutique
-  chart: oci://us-docker.pkg.dev/online-boutique-ci/charts/onlineboutique
+  chart: charts/onlineboutique
   version: 0.10.2
   values: []
 

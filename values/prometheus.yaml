@@ -1,0 +1,21 @@
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - prometheus.k8s.lab
+  prometheusSpec:
+    enableRemoteWriteReceiver: true
+    maximumStartupDurationSeconds: 120
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 10.0.0.17
+    annotations:
+      metallb.universe.tf/address-pool: default-pool
+grafana:
+  adminPassword: "admin"
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.k8s.lab

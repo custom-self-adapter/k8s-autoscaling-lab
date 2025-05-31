@@ -1,0 +1,23 @@
+persistence:
+  enabled: true
+  size: 5Gi
+  accessMode: ReadWriteOnce
+  storageClass: "local-path"
+
+service:
+  type: ClusterIP
+  port: 5000
+
+ingress:
+  enabled: true
+  hosts:
+    - registry.k8s.lab
+  tls:
+    - secretName: registry-tls
+      hosts:
+        - registry.k8s.lab
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi

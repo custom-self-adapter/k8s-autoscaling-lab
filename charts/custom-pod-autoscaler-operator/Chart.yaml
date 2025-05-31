@@ -1,0 +1,5 @@
+apiVersion: v2
+description: The Custom Pod Autoscaler Operator allows deployment of Custom Pod Autoscalers
+name: custom-pod-autoscaler-operator
+type: application
+version: v1.4.2

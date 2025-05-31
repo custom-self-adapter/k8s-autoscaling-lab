@@ -1,0 +1,32 @@
+{{ if eq .Values.mode "namespaced"}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        name: {{ .Chart.Name }}
+    spec:
+      serviceAccountName: {{ .Chart.Name }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "custompodautoscaler/operator:{{ .Chart.Version }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "custom-pod-autoscaler-operator"
+{{ end }}

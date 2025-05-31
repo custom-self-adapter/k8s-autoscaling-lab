@@ -1,0 +1,67 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: k8s-lab-root
+  namespace: cert-manager
+spec:
+  commonName: k8s.lab Root CA
+  isCA: true
+  duration: 87600h
+  secretName: k8s-lab-root
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: k8s-lab-ca
+spec:
+  ca:
+    secretName: k8s-lab-root
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-k8s-lab
+  namespace: ingress-nginx
+spec:
+  secretName: wildcard-k8s-lab-tls
+  commonName: "*.k8s.lab"
+  dnsNames:
+    - "*.k8s.lab"
+  issuerRef:
+    name: k8s-lab-ca
+    kind: ClusterIssuer
+  duration: 8760h
+  renewBefore: 720h
+
+---
+
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: k8s-lab-ca-bundle
+spec:
+  sources:
+    - useDefaultCAs: false
+    - secret:
+        name: k8s-lab-root
+        key: ca.crt
+  target:
+    configMap:
+      key: ca.crt
+    namespaceSelector: {}

@@ -14,4 +14,3 @@ controller:
       enabled: true
       additionalLabels:
         release: kube-prometheus-stack
-      interval: 30s

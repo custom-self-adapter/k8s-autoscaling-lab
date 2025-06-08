@@ -1,0 +1,21 @@
+prometheus:
+  url: http://kube-prometheus-stack-prometheus.monitoring
+
+rules:
+  default: false
+  external:
+    - seriesQuery: '{__name__="nginx_ingress_controller_request_duration_seconds_bucket",namespace!=""}'
+      resources:
+        template: <<.Resource>>
+        overrides:
+          exported_namespace:
+            resource: "namespace"
+      name:
+        as: frontend_latency_p95_ms
+      metricsQuery: >
+        histogram_quantile(
+          0.95,
+          sum(rate(
+            <<.Series>>{<<.LabelMatchers>>}[1m]
+          )) by (le)
+        ) * 1000

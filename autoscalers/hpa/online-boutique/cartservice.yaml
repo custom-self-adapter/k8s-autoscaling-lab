@@ -1,18 +1,18 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: currencyservice
+  name: cartservice
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: currencyservice
+    name: cartservice
   minReplicas: 1
   maxReplicas: 25
   metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 50
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 50

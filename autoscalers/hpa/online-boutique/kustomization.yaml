@@ -5,6 +5,9 @@ namespace: boutique
 resources:
   - frontend.yaml
   - currencyservice.yaml
+  - cartservice.yaml
+  - paymentservice.yaml
+  - recommendationservice.yaml
 
 generatorOptions:
   disableNameSuffixHash: true

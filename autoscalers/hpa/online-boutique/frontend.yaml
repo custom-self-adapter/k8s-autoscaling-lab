@@ -8,11 +8,15 @@ spec:
     kind: Deployment
     name: frontend
   minReplicas: 1
-  maxReplicas: 8
+  maxReplicas: 50
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 50
+    - type: External
+      external:
+        metric:
+          name: frontend_latency_p95_ms
+          selector:
+            matchLabels:
+              ingress: frontend
+        target:
+          type: Value
+          value: "2500"

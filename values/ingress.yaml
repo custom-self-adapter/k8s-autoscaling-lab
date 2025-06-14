@@ -3,6 +3,8 @@ controller:
   ingressClassResource:
     name: nginx
     enabled: true
+  extraArgs:
+    default-ssl-certificate: "ingress-nginx/wildcard-k8s-lab-tls"
   podAnnotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "10254"

@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-k8s-lab
+  namespace: ingress-nginx
+spec:
+  secretName: wildcard-k8s-lab-tls
+  commonName: "*.k8s.lab"
+  dnsNames:
+    - "*.k8s.lab"
+  issuerRef:
+    name: k8s-lab-ca
+    kind: ClusterIssuer
+  duration: 8760h
+  renewBefore: 720h

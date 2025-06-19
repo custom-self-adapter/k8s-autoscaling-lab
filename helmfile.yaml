@@ -71,11 +71,11 @@ releases:
     version: v1.4.2
     values: []
 
-  - name: online-boutique
-    namespace: boutique
-    chart: charts/onlineboutique
-    version: 0.10.2
-    values: []
+  # - name: online-boutique
+  #   namespace: boutique
+  #   chart: charts/onlineboutique
+  #   version: 0.10.2
+  #   values: []
 
   - name: registry
     namespace: registry

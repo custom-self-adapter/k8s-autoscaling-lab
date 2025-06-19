@@ -1,0 +1,29 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kube-znn
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kube-znn
+  minReplicas: 1
+  maxReplicas: 15
+  metrics:
+  - type: External
+    external:
+      metric:
+        name: frontend_latency_p95_ms
+        selector:
+          matchLabels:
+            ingress: "kube-znn"
+      target:
+        type: Value
+        value: "2500"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 30
+      policies:
+        - periodSeconds: 30
+          value: 50
+          type: "Percent"

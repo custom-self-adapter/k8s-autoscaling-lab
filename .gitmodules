@@ -5,3 +5,4 @@
 [submodule "vagrant-kubeadm-kubernetes"]
 	path = vagrant-kubeadm-kubernetes
 	url = git@gitlab.com:script-scaler/vagrant-kubeadm-kubernetes.git
+	branch = ca-inject

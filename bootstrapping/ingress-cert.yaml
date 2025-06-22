@@ -9,7 +9,7 @@ spec:
   dnsNames:
     - "*.k8s.lab"
   issuerRef:
-    name: k8s-lab-ca
+    name: lab-ca-issuer
     kind: ClusterIssuer
   duration: 8760h
   renewBefore: 720h

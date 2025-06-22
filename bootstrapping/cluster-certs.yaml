@@ -1,32 +1,7 @@
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: selfsigned-issuer
-spec:
-  selfSigned: {}
-
----
-
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: k8s-lab-root
-  namespace: cert-manager
-spec:
-  commonName: k8s.lab Root CA
-  isCA: true
-  duration: 87600h
-  secretName: k8s-lab-root
-  issuerRef:
-    name: selfsigned-issuer
-    kind: ClusterIssuer
-
----
-
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: k8s-lab-ca
+  name: lab-ca-issuer
 spec:
   ca:
-    secretName: k8s-lab-root
+    secretName: lab-ca-keypair

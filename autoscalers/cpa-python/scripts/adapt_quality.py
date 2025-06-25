@@ -7,12 +7,12 @@ from adapter_logger import AdapterLogger
 valid_qualities = ['20k', '200k', '400k', '800k']
 
 
-def rollout_in_progress(api: client.AppsV1Api, name: str, namespace: str = "default") -> bool:
+def rollout_in_progress(api: client.AppsV1Api, deploy_name: str, namespace: str = "default") -> bool:
     """
     Return True  ➜ a new ReplicaSet is still being rolled out
            False ➜ the Deployment is fully rolled out
     """
-    d = api.read_namespaced_deployment_status(name, namespace)
+    d = api.read_namespaced_deployment_status(deploy_name, namespace)
 
     # The Deployment controller first sets .status.observedGeneration
     # to match .metadata.generation, *then* updates the replica counts.
@@ -30,54 +30,69 @@ def rollout_in_progress(api: client.AppsV1Api, name: str, namespace: str = "defa
     return not rollout_complete
 
 
-def down(resource: dict):
-    logger = AdapterLogger("adapt_quality")
+def select_higher_quality(image_tag: str) -> str:
+    current_quality_idx = valid_qualities.index(image_tag)
+    max_index = len(valid_qualities) - 1
+    target_quality_idx = max_index if current_quality_idx == max_index else current_quality_idx + 1
+    return valid_qualities[target_quality_idx]
 
-    namespace = resource['metadata']['namespace']
-    name = resource['metadata']['name']
+
+def select_lower_quality(image_tag: str) -> str:
+    current_quality_idx = valid_qualities.index(image_tag)
+    target_quality_idx = 0 if current_quality_idx == 0 else current_quality_idx - 1
+    return valid_qualities[target_quality_idx]
+
+
+def adapt(container_name: str, deploy_name: str, namespace: str, up: bool):
+    logger = AdapterLogger("adapt_quality")
 
     config.load_incluster_config()
     appsV1 = client.AppsV1Api()
 
-    if rollout_in_progress(appsV1, name, namespace):
+    # Stops if there's already a rollout in progress
+    if rollout_in_progress(appsV1, deploy_name, namespace):
         logger.logger.info("Rollout in progress. Do nothing.")
         return
-
-    containers = resource['spec']['template']['spec']['containers']
-    container_znn = [c for c in containers if c['name'] == 'znn'][0]
-
-    deployment = appsV1.read_namespaced_deployment(
-        name,
-        namespace)
     
-    current_quality = container_znn['image'].split(":")[1]
-    cur_quality_idx = valid_qualities.index(current_quality)
-    target_quality_idx = 0 if cur_quality_idx == 0 else cur_quality_idx -1
-    logger.logger.debug(f"Next lower quality: {valid_qualities[target_quality_idx]}")
+    # Get the target deployment and container
+    deployment = appsV1.read_namespaced_deployment(deploy_name, namespace)
+    container = next(filter(lambda x: x.name == container_name, deployment.spec.template.spec.containers))
+    
+    # Stops if container not found
+    if not container:
+        logger.logger.error(f"Container {container_name} not found in {namespace}/{deploy_name}")
+        return
+    
+    # Gets the tag used, uses it to select a new tag
+    image_name, image_tag = container.image.split(':')
+    if up:
+        target_quality = select_higher_quality(image_tag)
+    else:
+        target_quality = select_lower_quality(image_tag)
+    
+    container_image = f"{image_name}:{target_quality}"
 
-    for container in deployment.spec.template.spec.containers:
-        if container.name == 'znn':
-            image_name = container.image.split(':')[0]
-            container_image = f"{image_name}:{valid_qualities[target_quality_idx]}"
-            logger.logger.debug(f"Patching image to {container_image}")
-            patch = {
+    #Patches the deployment with the new tag
+    patch = {
+        "spec": {
+            "template": {
                 "spec": {
-                    "template": {
-                        "spec": {
-                            "containers": [
-                                {
-                                    "name": "znn",
-                                    "image": container_image
-                                }
-                            ]
+                    "containers": [
+                        {
+                            "name": container_name,
+                            "image": container_image
                         }
-                    }
+                    ]
                 }
             }
-            appsV1.patch_namespaced_deployment(
-                name=name,
-                namespace=namespace,
-                body=patch
-            )
+        }
+    }
+    appsV1.patch_namespaced_deployment(name=deploy_name, namespace=namespace, body=patch)
 
+
+def up(container_name: str, deploy_name: str, namespace: str):
+    adapt(container_name, deploy_name, namespace, up=True)
     
+
+def down(container_name: str, deploy_name: str, namespace: str):
+    adapt(container_name, deploy_name, namespace, up=False)

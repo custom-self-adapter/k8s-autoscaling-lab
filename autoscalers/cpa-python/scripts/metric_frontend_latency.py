@@ -1,12 +1,23 @@
 import sys
 import json
+import yaml
 from adapter_logger import AdapterLogger
+
+
+def load_config(configfile = '/config.yaml'):
+    with open(configfile) as file:
+        try:
+            return yaml.safe_load(file)
+        except yaml.YAMLError as e:
+            sys.stderr.write(e)
+            return None
 
 
 def main():
     logger = AdapterLogger("metric_frontend_latency")
 
     spec = json.loads(sys.stdin.read())
+    config = load_config()
     
     kmetrics = spec["kubernetesMetrics"][0]
     current_replicas = kmetrics['current_replicas']
@@ -17,11 +28,12 @@ def main():
         {
             "current_replicas": current_replicas,
             "target_latency": target_value,
-            "ingress_latency": current_value
+            "ingress_latency": current_value,
+            "minReplicas": config['minReplicas'],
+            "maxReplicas": config['maxReplicas']
         }
     )
-
-    logger.logger.debug(metrics_result)
+    
     sys.stdout.write(metrics_result)
     
 

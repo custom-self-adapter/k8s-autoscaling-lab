@@ -17,10 +17,3 @@ spec:
   # roleRequiresMetricsServer: true
   # We will provision our own Role in role-cpa-python.yaml
   provisionRole: false
-  config:
-    - name: interval
-      value: "5000"
-    - name: minReplicas
-      value: "1"
-    - name: maxReplicas
-      value: "10"

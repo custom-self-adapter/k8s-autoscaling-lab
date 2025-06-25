@@ -25,5 +25,8 @@ kubernetesMetricSpecs:
         type: Value
         value: "2500m"
 runMode: "per-resource"
+minReplicas: 1
+maxReplicas: 10
+interval: 5000
 requireKubernetesMetrics: true
 logVerbosity: 1

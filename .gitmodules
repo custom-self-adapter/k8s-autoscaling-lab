@@ -1,8 +1,8 @@
 [submodule "kube-znn"]
 	path = kube-znn
-	url = git@gitlab.com:script-scaler/kube-znn.git
-	branch = script-scaler
+	url = git@github.com:custom-self-adapter/kube-znn.git
+	branch = csa
 [submodule "vagrant-kubeadm-kubernetes"]
 	path = vagrant-kubeadm-kubernetes
-	url = git@gitlab.com:script-scaler/vagrant-kubeadm-kubernetes.git
+	url = git@github.com:custom-self-adapter/vagrant-kubeadm-kubernetes.git
 	branch = ca-inject

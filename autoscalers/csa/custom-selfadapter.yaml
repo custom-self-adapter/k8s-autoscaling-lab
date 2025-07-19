@@ -1,0 +1,17 @@
+apiVersion: custom-self-adapter.net/v1
+kind: CustomSelfAdapter
+metadata:
+  namespace: default
+  name: csa-quality
+spec:
+  template:
+    spec:
+      containers:
+        - name: csa-quality-znn
+          image: registry.k8s.lab/csa-quality-znn:v0.1.1752698336
+          imagePullPolicy: Always
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kube-znn
+  roleRequiresMetricsServer: true

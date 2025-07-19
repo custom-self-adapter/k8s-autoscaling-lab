@@ -1,0 +1,39 @@
+metric:
+  type: "shell"
+  timeout: 1000
+  shell:
+    entrypoint: "python"
+    command:
+      - "/scripts/metric_frontend_latency.py"
+    logStderr: true
+evaluate:
+  type: "shell"
+  timeout: 1000
+  shell:
+    entrypoint: "python"
+    command:
+      - "/scripts/evaluate.py"
+adapt:
+  scale_cpu_replicas:
+    type: "shell"
+    timeout: 1000
+    shell:
+      entrypoint: "python"
+      command:
+        - "/scripts/scale_cpu_replicas.py"
+kubernetesMetricSpecs:
+  - type: External
+    external:
+      metric:
+        name: frontend_latency_p95_ms
+        selector:
+          matchLabels:
+            ingress: "kube-znn"
+      target:
+        type: Value
+        value: "2500m"
+interval: 30000
+minReplicas: 1
+maxReplicas: 8
+requireKubernetesMetrics: true
+logVerbosity: 3

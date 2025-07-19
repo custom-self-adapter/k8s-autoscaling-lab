@@ -34,4 +34,10 @@ The script `k6-go-build.sh` uses xk6 to build k6 with the `xk6-output-prometheus
 
 ## Kube ZNN
 
-Kube ZNN is used to act as the target system for the tests.
+Kube ZNN is used to act as the target system for the tests. The images are built and pushed by the `kube-znn/build.sh` script. This script tags the images with the `registry.k8s.lab` prefix, it is the Ingress for the registry installed by `helmfile.yaml`.
+
+The deploy for Kube ZNN is made via kustomize in the `kube/manifests` directory. It is recommended to use:
+
+```bash
+kubectl apply -k kube-znn/manifests/overlay/800k/
+```

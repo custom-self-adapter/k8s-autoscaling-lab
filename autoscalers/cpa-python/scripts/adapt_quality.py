@@ -4,7 +4,7 @@ from kubernetes import config, client
 from adapter_logger import AdapterLogger
 
 
-valid_qualities = ['20k', '200k', '400k', '800k']
+valid_qualities = ['20k', '100k', '200k', '400k', '600k', '800k']
 
 
 def rollout_in_progress(api: client.AppsV1Api, deploy_name: str, namespace: str = "default") -> bool:

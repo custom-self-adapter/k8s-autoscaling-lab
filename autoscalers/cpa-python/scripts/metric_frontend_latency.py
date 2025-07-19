@@ -21,7 +21,7 @@ def main():
     
     kmetrics = spec["kubernetesMetrics"][0]
     current_replicas = kmetrics['current_replicas']
-    target_value = kmetrics['spec']['external']['target']['value'] # "2500m"
+    target_value = kmetrics['spec']['external']['target']['value']
     current_value = kmetrics['external']['current']['value'] # 10000000 ou 10000m
 
     metrics_result = json.dumps(
@@ -33,7 +33,7 @@ def main():
             "maxReplicas": config['maxReplicas']
         }
     )
-    
+
     sys.stdout.write(metrics_result)
     
 

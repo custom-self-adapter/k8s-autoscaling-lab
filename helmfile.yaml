@@ -26,10 +26,6 @@ releases:
     chart: metallb/metallb
     namespace: metallb-system
     version: 0.15.2
-    values:
-      - installCRDs: true
-      - speaker:
-          tolerataMaster: true
 
   - name: local-path
     namespace: local-path-storage

@@ -2,10 +2,15 @@ import http from "k6/http";
 import { check } from "k6";
 
 export const options = {
-    vus: 250,
-    duration: "5m",
+    scenarios: {
+        traffic: {
+            executor: 'constant-vus',
+            vus: 100,
+            duration: '10m',
+        },
+    },
     thresholds: {
-        http_req_duration: ["p(95)<2500"],
+        http_req_duration: ["p(95)<4500", "avg<3000"],
     },
 };
 

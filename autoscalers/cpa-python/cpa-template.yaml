@@ -10,6 +10,13 @@ spec:
         - name: cpa-python-znn
           image: registry.k8s.lab/cpa-python:0.1-${TIMESTAMP}
           imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "512m"
+              memory: "1Gi"
+            limits:
+              cpu: "4"
+              memory: "2Gi"
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment

@@ -9,20 +9,22 @@ def load_config(configfile = '/config.yaml'):
         try:
             return yaml.safe_load(file)
         except yaml.YAMLError as e:
-            sys.stderr.write(e)
+            sys.stderr.write(f"{e}")
             return None
 
 
 def main():
     logger = AdapterLogger("metric_frontend_latency")
+    logger.logger.info("Starting metric_frontend_latency")
 
     spec = json.loads(sys.stdin.read())
     config = load_config()
-    
+
     kmetrics = spec["kubernetesMetrics"][0]
     current_replicas = kmetrics['current_replicas']
     target_value = kmetrics['spec']['external']['target']['value']
     current_value = kmetrics['external']['current']['value'] # 10000000 ou 10000m
+    logger.logger.info(f"read metrics target {target_value} current {current_value}")
 
     metrics_result = json.dumps(
         {
@@ -35,7 +37,7 @@ def main():
     )
 
     sys.stdout.write(metrics_result)
-    
+
 
 if __name__ == "__main__":
     main()

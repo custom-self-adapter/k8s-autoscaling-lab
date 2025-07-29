@@ -1,13 +1,13 @@
 evaluate:
   type: "shell"
-  timeout: 2500
+  timeout: 5000
   shell:
     entrypoint: "python"
     command:
       - "/scripts/evaluate.py"
 metric:
   type: "shell"
-  timeout: 2500
+  timeout: 5000
   shell:
     entrypoint: "python"
     command:
@@ -26,7 +26,7 @@ kubernetesMetricSpecs:
         value: "2500m"
 runMode: "per-resource"
 minReplicas: 1
-maxReplicas: 8
+maxReplicas: 12
 interval: 30000
 requireKubernetesMetrics: true
-logVerbosity: 1
+logVerbosity: 3

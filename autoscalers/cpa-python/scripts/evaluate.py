@@ -1,53 +1,59 @@
 import json
 import sys
 import math
-import adapt_quality
+import adapt_cpu
 from adapter_logger import AdapterLogger
 
+# This evaluate script does it's job on evaluating a replicas scale, writing
+# the result with the output_replicas function.
+# It also calls adapt_cpu to adapt the cpu resources from the managed resource,
+# expanding CPA functionality.
 
-def main():
-    logger = AdapterLogger("evaluate")
-    logger.logger.debug("Init evaluate")
+def main(logger, spec_raw):
 
-    spec = json.loads(sys.stdin.read())
-    # logger.logger.info(json.dumps(spec['metrics'], indent=2))
+    spec = json.loads(spec_raw)
     metrics = json.loads(spec['metrics'][0]['value'])
-    minReplicas = metrics['minReplicas']
-    maxReplicas = metrics['maxReplicas']
-    currentReplicas = metrics['current_replicas']
-    logger.logger.debug(json.dumps(metrics, indent=2))
+    min_replicas = metrics['minReplicas']
+    max_replicas = metrics['maxReplicas']
+    current_replicas = metrics['current_replicas']
 
-    latency_per_replica = metrics['ingress_latency'] / metrics['current_replicas']
-    logger.logger.debug(f"latency per replica: {latency_per_replica}")
+    # latency_per_replica = metrics['ingress_latency'] / metrics['current_replicas']
 
+    ingress_latency = float(metrics['ingress_latency'])
     target_latency = float(metrics['target_latency'].rstrip('m')) * 1000
 
-    # Using HPA algorithm
-    evaluation = math.ceil( metrics['current_replicas'] * ( metrics['ingress_latency'] / target_latency ))
-    logger.logger.debug(f"Calculated {evaluation} replicas")
+    rate = ingress_latency / target_latency
+    logger.logger.info(f"ingress_latency: {ingress_latency}")
+    logger.logger.info(f"target_latency: {target_latency}")
+    logger.logger.info(f"latency rate: {rate}")
+    namespace = spec['resource']['metadata']['namespace']
+    name = spec['resource']['metadata']['name']
+    container = 'znn'
 
-    if evaluation > minReplicas and evaluation < maxReplicas:
-        logger.logger.debug(f"Scaling to {evaluation} replicas")
-        output_replicas(evaluation)
+    if rate >= 0.95:
+        logger.logger.info("analyzed POOR")
+        if current_replicas < max_replicas and current_replicas < math.ceil(rate):
+            logger.logger.info(f"scaling to {math.ceil(rate)} replicas")
+            output_replicas(math.ceil(rate))
+        else:
+            logger.logger.info(f"scaling to {current_replicas + 1} replicas")
+            output_replicas(current_replicas + 1)
+        logger.logger.info("Will now call adapt_cpu")
+        adapt_cpu.up(container, name, namespace)
         return
 
-    if evaluation <= minReplicas:
-        namespace = spec['resource']['metadata']['namespace']
-        name = spec['resource']['metadata']['name']
-        container = 'znn'
-        logger.logger.debug("Adapting quality up")
-        adapt_quality.up(container, name, namespace)
-        output_replicas(evaluation)
+    if rate < 0.90:
+        logger.logger.info("analyzed EXCEEDED")
+        if current_replicas > min_replicas and current_replicas > math.ceil(rate):
+            logger.logger.info(f"scaling to {math.floor(rate)} replicas")
+            output_replicas(math.ceil(rate))
+        else:
+            output_replicas(current_replicas)
+        logger.logger.info("Will now call adapt_cpu")
+        adapt_cpu.down(container, name, namespace)
         return
 
-    if evaluation >= maxReplicas:
-        namespace = spec['resource']['metadata']['namespace']
-        name = spec['resource']['metadata']['name']
-        container = 'znn'
-        logger.logger.debug("Adapting quality down")
-        adapt_quality.down(container, name, namespace)
-        output_replicas(evaluation)
-        return
+    output_replicas(current_replicas)
 
 
 def output_replicas(replicas: int):
@@ -59,4 +65,8 @@ def output_replicas(replicas: int):
 
 
 if __name__ == "__main__":
-    main()
+    logger = AdapterLogger("evaluate")
+    logger.logger.info("Init evaluate")
+    spec_raw = sys.stdin.read()
+    logger.logger.info("calling main()")
+    main(logger, spec_raw)

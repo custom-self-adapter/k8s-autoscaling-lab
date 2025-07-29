@@ -8,7 +8,7 @@ spec:
     kind: Deployment
     name: kube-znn
   minReplicas: 1
-  maxReplicas: 15
+  maxReplicas: 10
   metrics:
   - type: External
     external:
@@ -19,7 +19,7 @@ spec:
             ingress: "kube-znn"
       target:
         type: Value
-        value: "2500"
+        value: "4500"
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 30

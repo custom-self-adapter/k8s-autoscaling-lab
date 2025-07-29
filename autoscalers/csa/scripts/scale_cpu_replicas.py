@@ -2,8 +2,11 @@ import json
 import sys
 
 from kubernetes import config, client
-from kubernetes.config.dateutil import math
 from adapter_logger import AdapterLogger
+import initial_limits
+
+
+container_name = 'znn'
 
 
 def rollout_in_progress(deployment) -> bool:
@@ -38,6 +41,8 @@ def main(spec_raw):
     config.load_incluster_config()
     appsV1 = client.AppsV1Api()
 
+    initial_limits.store_limits(resource['metadata']['name'], resource['metadata']['namespace'], container_name)
+
     deployment = appsV1.read_namespaced_deployment(
         name=resource['metadata']['name'],
         namespace=resource['metadata']['namespace']
@@ -47,10 +52,10 @@ def main(spec_raw):
         logger.logger.info("Rollout in progress. Do nothing.")
         return
 
-    container = next(filter(lambda x: x.name == "znn", deployment.spec.template.spec.containers))
+    container = next(filter(lambda x: x.name == container_name, deployment.spec.template.spec.containers))
 
     if not container:
-        logger.logger.error(f"Container znn not found in {resource['metadata']['namespace']}/{resource['metadata']['name']}")
+        logger.logger.error(f"Container {container_name} not found in {resource['metadata']['namespace']}/{resource['metadata']['name']}")
         return
 
     parameters = spec['evaluation']['parameters']
@@ -67,34 +72,44 @@ def main(spec_raw):
     logger.logger.info(f"replicas_change: {replicas_change}")
     logger.logger.info(f"cpu_change: {cpu_change}")
 
-    current_cpu_requests = container.resources.requests["cpu"]
     current_cpu_limits = container.resources.limits["cpu"]
-    current_cpu_requests = current_cpu_requests[0:current_cpu_requests.index("m")]
     current_cpu_limits = current_cpu_limits[0:current_cpu_limits.index("m")]
+    initial = json.loads(initial_limits.get_limits())
+    initial_cpu_limits = initial['limits']['cpu']
+    initial_cpu_limits = initial_cpu_limits[0:initial_cpu_limits.index("m")]
+
+    logger.logger.info(f"initial cpu: {initial_cpu_limits}")
+    logger.logger.info(f"current cpu: {current_cpu_limits}")
 
     if direction == 'up':
-        cpu_change = 1 + cpu_change
         deployment.spec.replicas = deployment.spec.replicas + replicas_change
+        cpu_change = 1 + cpu_change
+        new_cpu_limits = max(int(float(current_cpu_limits) * cpu_change), int(current_cpu_limits))
+        logger.logger.info(f"calculated : {new_cpu_limits}")
 
     if direction == 'down':
-        cpu_change = 1 - cpu_change
         if deployment.spec.replicas > 1:
             deployment.spec.replicas = deployment.spec.replicas - replicas_change
+        if cpu_change != 1:
+            cpu_change = 1 - cpu_change
+        new_cpu_limits = min(int(float(current_cpu_limits) * cpu_change), int(current_cpu_limits))
+        new_cpu_limits = max(new_cpu_limits, int(initial_cpu_limits))
+        logger.logger.info(f"calculated : {new_cpu_limits}")
 
-
-    # determines a floor for cpu requests and limits
-    new_cpu_requests = max(int(float(current_cpu_requests) * cpu_change), 50)
-    new_cpu_requests = f"{new_cpu_requests}m"
-    new_cpu_limits = max(int(float(current_cpu_limits) * cpu_change), 100)
     new_cpu_limits = f"{new_cpu_limits}m"
-    container.resources.requests["cpu"] = new_cpu_requests
     container.resources.limits["cpu"] = new_cpu_limits
 
-    appsV1.patch_namespaced_deployment(
+    logger.logger.info(f"Will patch with replicas {deployment.spec.replicas} and cpu {container.resources.limits['cpu']}")
+
+    patched_deployment = appsV1.patch_namespaced_deployment(
         name=resource['metadata']['name'],
         namespace=resource['metadata']['namespace'],
         body=deployment
     )
+
+    sys.stdout.write(json.dumps({
+        "replicas": patched_deployment.spec.replicas
+    }))
 
 
 if __name__ == '__main__':

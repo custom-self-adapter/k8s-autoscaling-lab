@@ -16,7 +16,7 @@ evaluate:
 adapt:
   scale_cpu_replicas:
     type: "shell"
-    timeout: 1000
+    timeout: 2000
     shell:
       entrypoint: "python"
       command:
@@ -31,9 +31,9 @@ kubernetesMetricSpecs:
             ingress: "kube-znn"
       target:
         type: Value
-        value: "2500m"
-interval: 30000
+        value: "4500m"
+interval: 15000
 minReplicas: 1
-maxReplicas: 8
+maxReplicas: 10
 requireKubernetesMetrics: true
 logVerbosity: 3

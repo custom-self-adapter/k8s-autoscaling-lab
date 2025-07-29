@@ -35,8 +35,8 @@ def main(spec_raw: str):
     target_latency = float(metrics['target_latency'].rstrip('m')) * 1000
     rate = current_latency / target_latency
 
-    if current_latency == 0:
-        return
+    # if current_latency == 0:
+    #     return
 
     plan(resource, rate, min_replicas, max_replicas)
 
@@ -49,13 +49,12 @@ def plan(resource, rate, min_replicas, max_replicas):
 
     if rate >= 0.95:
         logger.logger.info("analyzed POOR")
-        if current_replicas < max_replicas:
-            write_evaluation('scale_cpu_replicas', {
-                'direction': 'up',
-                'replicas': math.floor(rate),
-                'cpu': 0.2
-            })
-            return
+        write_evaluation('scale_cpu_replicas', {
+            'direction': 'up',
+            'replicas': math.floor(rate) if current_replicas < max_replicas else 0,
+            'cpu': 0.2
+        })
+        return
     if rate < 0.90:
         logger.logger.info("analyzed EXCEEDED")
         if current_replicas > min_replicas:
@@ -63,13 +62,17 @@ def plan(resource, rate, min_replicas, max_replicas):
                 'direction': 'down',
                 'replicas': 1
             })
-            return
         else:
             write_evaluation('scale_cpu_replicas', {
                 'direction': 'down',
                 'cpu': 0.2
             })
-            return
+        return
+    logger.logger.info("analyzed SUFFICIENT")
+    write_evaluation('scale_cpu_replicas',  {
+        'direction': 'down'
+        # No parameters = no adapting will be performed
+    })
 
 
 def write_evaluation(strategy, params):

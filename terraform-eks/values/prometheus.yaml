@@ -1,0 +1,35 @@
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:sa-east-1:<ACCOUNT_ID>:certificate/<ID>
+    hosts:
+      - prometheus.k8s.lab
+  prometheusSpec:
+    enableRemoteWriteReceiver: true
+    maximumStartupDurationSeconds: 120
+  service:
+    type: LoadBalancer
+    loadBalancerIP: 10.0.0.17
+    annotations:
+      metallb.universe.tf/address-pool: default-pool
+  nodeSelector:
+    role: observability
+grafana:
+  adminPassword: "admin"
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:sa-east-1:<ACCOUNT_ID>:certificate/<ID>
+    hosts:
+      - grafana.k8s.lab
+  nodeSelector:
+    role: observability

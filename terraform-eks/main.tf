@@ -20,11 +20,16 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_partition" "current" {}
+
 locals {
-  azs          = slice(data.aws_availability_zones.available.names, 0, 2)
-  vpc_cidr     = "10.0.0.0/16"
-  priv_subnets = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
-  pub_subnets  = ["10.0.3.0/24", "10.0.4.0/24", "10.0.5.0/24"]
+  root_user_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
+  azs           = slice(data.aws_availability_zones.available.names, 0, 2)
+  vpc_cidr      = "10.0.0.0/16"
+  priv_subnets  = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+  pub_subnets   = ["10.0.3.0/24", "10.0.4.0/24", "10.0.5.0/24"]
   tags = {
     "terraform"     = "true"
     "project.owner" = "humbertofraga"
@@ -84,6 +89,20 @@ module "eks" {
 
   authentication_mode                      = "API_AND_CONFIG_MAP"
   enable_cluster_creator_admin_permissions = true
+
+  access_entries = {
+    root = {
+      principal_arn = local.root_user_arn
+      policy_associations = {
+        eks_cluster_admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+  }
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.public_subnets

@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    helm = {
+      source = "hashicorp/helm",
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -16,6 +20,14 @@ provider "aws" {
   region = var.aws_region
 }
 
+provider "helm" {
+  kubernetes = {
+    host = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    token = data.aws_eks_cluster_auth.this.token
+  }
+}
+
 data "aws_availability_zones" "available" {
   state = "available"
 }
@@ -23,6 +35,10 @@ data "aws_availability_zones" "available" {
 data "aws_caller_identity" "current" {}
 
 data "aws_partition" "current" {}
+
+data "aws_eks_cluster_auth" "this" {
+  name = module.eks.cluster_name
+}
 
 locals {
   root_user_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
@@ -57,6 +73,13 @@ module "vpc" {
   single_nat_gateway      = true
   create_igw              = true
 
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+  }
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = "1"
+  }
+
   tags = local.tags
 }
 
@@ -71,6 +94,9 @@ module "eks" {
   upgrade_policy = {
     support_type = "STANDARD"
   }
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.public_subnets
 
   endpoint_public_access       = true
   endpoint_public_access_cidrs = var.allowed_cidrs
@@ -104,9 +130,6 @@ module "eks" {
     }
   }
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.public_subnets
-
   # Managed node groups matching requested capacities
   eks_managed_node_groups = {
     # # 2 × 2 CPU / 2 GiB
@@ -118,7 +141,10 @@ module "eks" {
       desired_size   = 2
       max_size       = 2
       min_size       = 2
-      labels         = { "role" = "app" }
+      labels         = {
+        "node-role.kubernetes.io/app" = true,
+        "workload" = "app"
+      }
       tags           = local.tags
     }
 
@@ -131,20 +157,26 @@ module "eks" {
       desired_size   = 1
       max_size       = 1
       min_size       = 1
-      labels         = { "role" = "db" }
+      labels         = {
+        "node-role.kubernetes.io/db" = true,
+        "workload" = "db"
+      }
       tags           = local.tags
     }
 
     # 1 × 2 CPU / 4 GiB
-    monitor = {
-      name           = "ng-monitor"
+    lab_system = {
+      name           = "ng-lab_system"
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["t3.medium"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1
       min_size       = 1
-      labels         = { "role" = "monitor" }
+      labels         = {
+        "node-role.kubernetes.io/lab_system" = true,
+        "workload" = "lab_system"
+      }
       tags           = local.tags
     }
 
@@ -157,12 +189,25 @@ module "eks" {
       desired_size   = 1
       max_size       = 1
       min_size       = 1
-      labels         = { "role" = "adaptation" }
+      labels         = {
+        "node-role.kubernetes.io/adaptation" = true,
+        "workload" = "adaptation"
+      }
       tags           = local.tags
     }
   }
 
   tags = local.tags
+}
+
+########################################
+# ECR Private Repositories
+########################################
+
+resource "aws_ecr_repository" "znn" {
+  name                 = "${var.cluster_name}/znn"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
 }
 
 ########################################
@@ -183,4 +228,9 @@ variable "cluster_name" {
 variable "allowed_cidrs" {
   type    = list(string)
   default = ["179.67.254.87/32"]
+}
+
+variable "role_name" {
+  type    = string
+  default = "eks-tf"
 }

@@ -142,7 +142,6 @@ module "eks" {
       max_size       = 2
       min_size       = 2
       labels         = {
-        "node-role.kubernetes.io/app" = true,
         "workload" = "app"
       }
       tags           = local.tags
@@ -158,7 +157,6 @@ module "eks" {
       max_size       = 1
       min_size       = 1
       labels         = {
-        "node-role.kubernetes.io/db" = true,
         "workload" = "db"
       }
       tags           = local.tags
@@ -174,7 +172,6 @@ module "eks" {
       max_size       = 1
       min_size       = 1
       labels         = {
-        "node-role.kubernetes.io/lab_system" = true,
         "workload" = "lab_system"
       }
       tags           = local.tags
@@ -190,7 +187,6 @@ module "eks" {
       max_size       = 1
       min_size       = 1
       labels         = {
-        "node-role.kubernetes.io/adaptation" = true,
         "workload" = "adaptation"
       }
       tags           = local.tags

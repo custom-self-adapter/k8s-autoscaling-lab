@@ -48,8 +48,8 @@ resource "helm_release" "aws_load_balancer_controller" {
       value = module.iam_irsa_alb.arn
     },
     {
-      name = "nodeSelector",
-      value = "workload: lab_system"
+      name = "nodeSelector.workload",
+      value = "lab_system"
     }
   ]
 }

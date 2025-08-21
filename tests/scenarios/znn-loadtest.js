@@ -5,12 +5,12 @@ export const options = {
     scenarios: {
         traffic: {
             executor: 'constant-vus',
-            vus: 100,
+            vus: 500,
             duration: '10m',
         },
     },
     thresholds: {
-        http_req_duration: ["p(95)<4500", "avg<3000"],
+        http_req_duration: ["p(95)<500", "avg<300"],
     },
 };
 

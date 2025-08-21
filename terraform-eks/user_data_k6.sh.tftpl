@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+dnf update -y
+dnf install -y curl-minimal git tar gzip make gcc
+
+GO_VERSION=${go_version}
+USER_HOME="/home/ec2-user"
+GOROOT=$${USER_HOME}/.local/go
+GOPATH=$${USER_HOME}/go
+
+
+curl -L "https://go.dev/dl/go$${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
+mkdir -p "$${USER_HOME}/.local"
+tar -C "$${USER_HOME}/.local" -xzf /tmp/go.tgz
+chown -R ec2-user:ec2-user "$${USER_HOME}"
+
+cat >> "$${USER_HOME}/.bash_profile" <<'EOF'
+export GOROOT="$HOME/.local/go"
+export GOPATH="$HOME/go"
+export PATH="$PATH:$GOROOT/bin:$GOPATH/bin"
+EOF
+
+echo "Bootstrap completed" > /var/log/k6-userdata-ready

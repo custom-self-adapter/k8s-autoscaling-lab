@@ -159,7 +159,7 @@ module "eks" {
     db = {
       name           = "ng-db"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["t3.micro"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1
@@ -170,26 +170,11 @@ module "eks" {
       tags = local.tags
     }
 
-    # 1 × 2 CPU / 4 GiB
-    lab_system = {
-      name           = "ng-lab_system"
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
-      capacity_type  = "ON_DEMAND"
-      desired_size   = 1
-      max_size       = 1
-      min_size       = 1
-      labels = {
-        "workload" = "lab_system"
-      }
-      tags = local.tags
-    }
-
     # # 1 × 2 CPU / 4 GiB
     adaptation = {
       name           = "ng-adaptation"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.small"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1

@@ -48,6 +48,11 @@ resource "aws_iam_role_policy_attachment" "ssm_managed" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+resource "aws_iam_role_policy_attachment" "s3_managed" {
+  role       = aws_iam_role.ssm_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
 resource "aws_iam_instance_profile" "ssm_ec2" {
   name = "${var.cluster_name}-k6-ssm-profile"
   role = aws_iam_role.ssm_ec2.name

@@ -6,3 +6,4 @@ venv
 terraform.tfstate
 terraform.tfstate.backup
 terraform/id_rsa*
+terraform/kubeconfig_lab-csa.yaml

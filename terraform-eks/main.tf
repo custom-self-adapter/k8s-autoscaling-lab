@@ -10,13 +10,9 @@ terraform {
       source  = "hashicorp/helm",
       version = "~> 3.0"
     }
-    tls   = {
-      source = "hashicorp/tls",
-      version = "~> 4.1"
-    }
     local = {
-      source = "hashicorp/local",
-      version = "~> 2.5"
+      source  = "hashicorp/local",
+      version = "2.5.3"
     }
   }
 }
@@ -36,6 +32,12 @@ provider "helm" {
   }
 }
 
+provider "local" {}
+
+########################################
+# Datum and Locals
+########################################
+
 data "aws_availability_zones" "available" {
   state = "available"
 }
@@ -50,10 +52,11 @@ data "aws_eks_cluster_auth" "this" {
 
 locals {
   root_user_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
-  azs           = slice(data.aws_availability_zones.available.names, 0, 2)
-  vpc_cidr      = "10.0.0.0/16"
-  priv_subnets  = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
-  pub_subnets   = ["10.0.3.0/24", "10.0.4.0/24", "10.0.5.0/24"]
+
+  azs          = slice(data.aws_availability_zones.available.names, 0, 2)
+  vpc_cidr     = "10.0.0.0/16"
+  priv_subnets = ["10.0.0.0/24", "10.0.2.0/24"]
+  pub_subnets  = ["10.0.1.0/24", "10.0.3.0/24"]
   tags = {
     "terraform"     = "true"
     "project.owner" = "humbertofraga"
@@ -74,19 +77,11 @@ module "vpc" {
   private_subnets = local.priv_subnets
   public_subnets  = local.pub_subnets
 
-  map_public_ip_on_launch = true
-  enable_dns_hostnames    = true
-  enable_dns_support      = true
-  enable_nat_gateway      = true
-  single_nat_gateway      = true
-  create_igw              = true
-
-  public_subnet_tags = {
-    "kubernetes.io/role/elb" = "1"
-  }
-  private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = "1"
-  }
+  enable_dns_hostnames   = true
+  enable_dns_support     = true
+  enable_nat_gateway     = true
+  single_nat_gateway     = true
+  one_nat_gateway_per_az = false
 
   tags = local.tags
 }
@@ -103,22 +98,23 @@ module "eks" {
     support_type = "STANDARD"
   }
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.public_subnets
+  vpc_id                   = module.vpc.vpc_id
+  subnet_ids               = [module.vpc.private_subnets[0]]
+  control_plane_subnet_ids = module.vpc.private_subnets
 
   endpoint_public_access       = true
   endpoint_public_access_cidrs = var.allowed_cidrs
   endpoint_private_access      = true
 
   addons = {
-    coredns = {}
     eks-pod-identity-agent = {
       before_compute = true
     }
-    kube-proxy = {}
     vpc-cni = {
       before_compute = true
     }
+    coredns    = {}
+    kube-proxy = {}
   }
 
   authentication_mode                      = "API_AND_CONFIG_MAP"
@@ -159,7 +155,7 @@ module "eks" {
     db = {
       name           = "ng-db"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.micro"]
+      instance_types = ["t3.small"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1
@@ -186,7 +182,42 @@ module "eks" {
     }
   }
 
+  node_security_group_additional_rules = {
+    allow_http_from_k6 = {
+      description              = "Allow HTTP from k6 EC2 SG to worker nodes"
+      protocol                 = "tcp"
+      from_port                = 80
+      to_port                  = 8080
+      type                     = "ingress"
+      source_security_group_id = module.ec2_k6.security_group_id
+    }
+  }
+
   tags = local.tags
+}
+
+resource "local_file" "kubeconfig" {
+  filename = "${path.module}/kubeconfig_${var.cluster_name}.yaml"
+  content  = <<EOT
+apiVersion: v1
+clusters:
+- cluster:
+    server: ${module.eks.cluster_endpoint}
+    certificate-authority-data: ${module.eks.cluster_certificate_authority_data}
+  name: ${module.eks.cluster_name}
+contexts:
+- context:
+    cluster: ${module.eks.cluster_name}
+    user: ${module.eks.cluster_name}
+  name: ${module.eks.cluster_name}
+current-context: ${module.eks.cluster_name}
+kind: Config
+preferences: {}
+users:
+- name: ${module.eks.cluster_name}
+  user:
+    token: ${data.aws_eks_cluster_auth.this.token}
+EOT
 }
 
 ########################################

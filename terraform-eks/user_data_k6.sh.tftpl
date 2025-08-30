@@ -6,20 +6,22 @@ dnf update -y
 dnf install -y curl-minimal git tar gzip make gcc
 
 GO_VERSION=${go_version}
-USER_HOME="/home/ec2-user"
-GOROOT=$${USER_HOME}/.local/go
-GOPATH=$${USER_HOME}/go
+REPO_PATH=/opt/k8s-autoscaling-lab
 
 
 curl -L "https://go.dev/dl/go$${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
-mkdir -p "$${USER_HOME}/.local"
-tar -C "$${USER_HOME}/.local" -xzf /tmp/go.tgz
-chown -R ec2-user:ec2-user "$${USER_HOME}"
+rm -rf /usr/local/go
+tar -C /usr/local -xzf /tmp/go.tgz
+rm /tmp/go.tgz
 
-cat >> "$${USER_HOME}/.bash_profile" <<'EOF'
-export GOROOT="$HOME/.local/go"
+cat >> "/etc/profile.d/go.sh" <<'EOF'
 export GOPATH="$HOME/go"
-export PATH="$PATH:$GOROOT/bin:$GOPATH/bin"
+export PATH="$GOPATH/bin:/usr/local/go/bin:$PATH"
 EOF
+chmod 0644 /etc/profile.d/go.sh
+
+git clone https://github.com/custom-self-adapter/k8s-autoscaling-lab.git $${REPO_PATH}
+cd $${REPO_PATH}
+chmod -R a+rX $${REPO_PATH}
 
 echo "Bootstrap completed" > /var/log/k6-userdata-ready

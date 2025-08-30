@@ -13,24 +13,6 @@ data "aws_ami" "al2023" {
   }
 }
 
-# SSH Key Pair
-resource "tls_private_key" "k6_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-resource "aws_key_pair" "k6_key" {
-  key_name   = "${var.cluster_name}-ssh"
-  public_key = tls_private_key.k6_key.public_key_openssh
-  tags       = local.tags
-}
-
-resource "local_file" "k6_pem" {
-  filename        = "${path.module}/id_rsa_${var.cluster_name}"
-  content         = tls_private_key.k6_key.private_key_openssh
-  file_permission = "0600"
-}
-
 # Security Group
 resource "aws_security_group" "k6_sg" {
   name        = "${var.cluster_name}-k6-sg"
@@ -39,18 +21,36 @@ resource "aws_security_group" "k6_sg" {
   tags        = local.tags
 }
 
-resource "aws_vpc_security_group_ingress_rule" "k6_allow_ssh" {
-  security_group_id = aws_security_group.k6_sg.id
-  ip_protocol       = "tcp"
-  from_port         = 22
-  to_port           = 22
-  cidr_ipv4         = var.allowed_cidrs[0]
-}
-
 resource "aws_vpc_security_group_egress_rule" "k6_allow_all" {
   security_group_id = aws_security_group.k6_sg.id
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
+}
+
+data "aws_iam_policy_document" "ec2_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ssm_ec2" {
+  name               = "${var.cluster_name}-k6-ssm-role"
+  assume_role_policy = data.aws_iam_policy_document.ec2_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_managed" {
+  role       = aws_iam_role.ssm_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ssm_ec2" {
+  name = "${var.cluster_name}-k6-ssm-profile"
+  role = aws_iam_role.ssm_ec2.name
 }
 
 # EC2 Instance
@@ -59,11 +59,11 @@ module "ec2_k6" {
 
   name = "${var.cluster_name}-k6"
 
-  subnet_id                   = module.vpc.public_subnets[0]
-  vpc_security_group_ids      = [aws_security_group.k6_sg.id]
-  associate_public_ip_address = true
+  iam_instance_profile = aws_iam_instance_profile.ssm_ec2.name
 
-  key_name = aws_key_pair.k6_key.key_name
+  subnet_id                   = module.vpc.private_subnets[0]
+  vpc_security_group_ids      = [aws_security_group.k6_sg.id]
+  associate_public_ip_address = false
 
   instance_type = "t3a.small"
 
@@ -75,11 +75,6 @@ module "ec2_k6" {
 }
 
 variable "go_version" {
-  type = string
+  type    = string
   default = "1.24.6"
-}
-
-output "k6_public_ip" {
-  description = "Public IP for the K6 station intance"
-  value = module.ec2_k6.public_ip
 }

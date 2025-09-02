@@ -206,6 +206,14 @@ module "eks" {
       type                     = "ingress"
       source_security_group_id = module.eks.node_security_group_id
     }
+    allow_http_from_k6 = {
+      description              = "Allow HTTP from k6 on 30080"
+      protocol                 = "tcp"
+      from_port                = 30080
+      to_port                  = 30080
+      type                     = "ingress"
+      source_security_group_id = module.ec2_k6.security_group_id
+    }
   }
 
   tags = local.tags

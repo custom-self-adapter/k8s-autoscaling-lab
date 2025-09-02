@@ -13,13 +13,13 @@ spec:
   - type: External
     external:
       metric:
-        name: frontend_latency_p95_ms
+        name: nginx_ingress_p95_ms
         selector:
           matchLabels:
             ingress: "kube-znn"
       target:
         type: Value
-        value: "4500"
+        value: "900"
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 30

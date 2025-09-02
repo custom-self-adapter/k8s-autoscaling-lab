@@ -180,16 +180,31 @@ module "eks" {
       }
       tags = local.tags
     }
+
+    monitoring = {
+      name           = "ng-monitoring"
+      ami_type       = "AL2023_x86_64_STANDARD"
+      instance_types = ["t3.small"]
+      capacity_type  = "ON_DEMAND"
+      desired_size   = 1
+      max_size       = 1
+      min_size       = 1
+      labels = {
+        "workload" = "monitoring"
+        "edge"     = "ingress"
+      }
+      tags = local.tags
+    }
   }
 
   node_security_group_additional_rules = {
-    allow_http_from_k6 = {
-      description              = "Allow HTTP from k6 EC2 SG to worker nodes"
-      protocol                 = "tcp"
-      from_port                = 80
-      to_port                  = 8080
+    allow_internode_all = {
+      description              = "Allow all trafic between nodes"
+      protocol                 = "-1"
+      from_port                = 0
+      to_port                  = 0
       type                     = "ingress"
-      source_security_group_id = module.ec2_k6.security_group_id
+      source_security_group_id = module.eks.node_security_group_id
     }
   }
 
@@ -197,8 +212,9 @@ module "eks" {
 }
 
 resource "local_file" "kubeconfig" {
-  filename = "${path.module}/kubeconfig_${var.cluster_name}.yaml"
-  content  = <<EOT
+  filename        = "${path.module}/kubeconfig_${var.cluster_name}.yaml"
+  file_permission = "0640"
+  content         = <<EOT
 apiVersion: v1
 clusters:
 - cluster:
@@ -218,6 +234,41 @@ users:
   user:
     token: ${data.aws_eks_cluster_auth.this.token}
 EOT
+}
+
+########################################
+# Wait for CoreDNS before continue
+########################################
+resource "null_resource" "wait_for_coredns" {
+  depends_on = [
+    module.eks,
+    local_file.kubeconfig
+  ]
+  triggers = {
+    cluster_name     = module.eks.cluster_name
+    cluster_endpoint = module.eks.cluster_endpoint
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-lc"]
+    environment = {
+      KUBECONFIG = local_file.kubeconfig.filename
+    }
+    command = <<-EOT
+      set -euo pipefail
+      echo "[wait_for_coredns] Waiting for CoreDNS become Available..."
+      for i in {1..30}; do
+        if kubectl -n kube-system wait --for=condition=Available deploy/coredns --timeout=10s >/dev/null 2>&1; then
+          echo "[wait_for_coredns] CoreDNS ready."
+          exit 0
+        fi
+        echo "[wait_for_coredns] CoreDNS not ready..."
+        sleep 10
+      done
+      echo "[wait_for_coredns] TIMEOUT waiting for CoreDNS."
+      exit 1
+    EOT
+  }
 }
 
 ########################################

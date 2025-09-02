@@ -3,32 +3,12 @@ resource "helm_release" "metrics_server" {
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
   chart      = "metrics-server"
   # Fixe uma versão estável do chart (ex.: 3.13.0 no momento da escrita)
-  version = "3.13.0"
+  version    = "3.13.0"
+  depends_on = [null_resource.wait_for_coredns]
 
   namespace        = "kube-system"
   create_namespace = false
 
-  # Aguarde o cluster e o CoreDNS (você já tem um wait_coredns)
-  # depends_on = [
-  #   null_resource.wait_coredns
-  # ]
-
-  # Exemplos de overrides (descomente somente se precisar)
-  # set {
-  #   name  = "args.kubelet-preferred-address-types"
-  #   value = "InternalIP,ExternalIP,Hostname"
-  # }
-  # set {
-  #   name  = "args.kubelet-insecure-tls"
-  #   value = "true"       # use SOMENTE se houver erro de TLS ao falar com os kubelets
-  # }
-  #
-  # Se desejar fixar a porta segura do metrics-server (normalmente não precisa):
-  # set { name = "containerPort" value = "10258" }
-  #
-  # Se quiser expor ServiceMonitor p/ Prometheus:
-  # set { name = "metrics.enabled" value = "true" }
-  # set { name = "metrics.serviceMonitor.enabled" value = "true" }
 }
 
 resource "helm_release" "ingress_nginx" {
@@ -36,31 +16,44 @@ resource "helm_release" "ingress_nginx" {
   namespace        = "ingress-nginx"
   chart            = "ingress-nginx"
   repository       = "https://kubernetes.github.io/ingress-nginx"
-  version          = "4.13.1"
+  version          = "4.13.2"
   create_namespace = true
+
+  depends_on = [helm_release.kube_prometheus_stack]
 
   # NÃO cria Service LoadBalancer
   values = [
     yamlencode({
       controller = {
+
         service = {
-          external = {
-            enabled = false
-          }
-          internal = {
-            enabled = true
-            annotations = {
-              "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"                  = "tcp"
-              "service.beta.kubernetes.io/aws-load-balancer-type"                              = "nlb"
-              "service.beta.kubernetes.io/aws-load-balancer-scheme"                            = "internal"
-              "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled" = "true"
-              "service.beta.kubernetes.io/aws-load-balancer-internal"                          = "true"
-            }
+          enabled = true
+          type    = "NodePort"
+          nodePorts = {
+            http  = 30080
+            https = 0
           }
         }
 
-        # (opcional) para fixar scheduling/afinidade/tolerations, adicione aqui
-        # nodeSelector = { "node.kubernetes.io/ingress" = "true" }
+        nodeSelector = {
+          edge = "ingress"
+        }
+        podAnnotations = {
+          "prometheus.io/scrape" = "true"
+          "prometheus.io/port"   = "10254"
+        }
+        metrics = {
+          enabled = true
+          serviceMonitor = {
+            enabled = true
+            additionalLabels = {
+              release = "prom"
+            }
+          }
+        }
+        extraArgs = {
+          "metrics-per-host" = "false"
+        }
       }
     })
   ]

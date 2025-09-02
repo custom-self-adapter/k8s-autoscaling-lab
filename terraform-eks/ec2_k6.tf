@@ -16,7 +16,7 @@ data "aws_ami" "al2023" {
 # Security Group
 resource "aws_security_group" "k6_sg" {
   name        = "${var.cluster_name}-k6-sg"
-  description = "Allows SSH inbound and all traffic outbound"
+  description = "Allows all traffic outbound"
   vpc_id      = module.vpc.vpc_id
   tags        = local.tags
 }

@@ -6,8 +6,9 @@ then
 fi
 
 DEFAULTTESTNAME='ob-loadtest'
-TESTNAME="${1:-$DEFAULTTESTNAME}"
-export BASE_URL='http://znn.k8s.lab'
+DEFAULTBASEURL='http://znn.k8s.lab'
+export BASE_URL="${1:-$DEFAULTBASEURL}"
+TESTNAME="${2:-$DEFAULTTESTNAME}"
 
 ./k6 run tests/scenarios/$TESTNAME.js \
     --tag testid=$(date +%s) \

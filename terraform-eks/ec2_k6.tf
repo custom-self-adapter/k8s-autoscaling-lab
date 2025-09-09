@@ -66,11 +66,11 @@ module "ec2_k6" {
 
   iam_instance_profile = aws_iam_instance_profile.ssm_ec2.name
 
-  subnet_id                   = module.vpc.private_subnets[0]
+  subnet_id                   = module.vpc.public_subnets[0]
   vpc_security_group_ids      = [aws_security_group.k6_sg.id]
   associate_public_ip_address = false
 
-  instance_type = "t3a.small"
+  instance_type = "t3a.medium"
 
   user_data = templatefile("${path.module}/user_data_k6.sh.tftpl", {
     go_version = var.go_version

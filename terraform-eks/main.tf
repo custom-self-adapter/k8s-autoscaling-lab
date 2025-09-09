@@ -77,6 +77,8 @@ module "vpc" {
   private_subnets = local.priv_subnets
   public_subnets  = local.pub_subnets
 
+  map_public_ip_on_launch = true
+
   enable_dns_hostnames   = true
   enable_dns_support     = true
   enable_nat_gateway     = true
@@ -99,22 +101,20 @@ module "eks" {
   }
 
   vpc_id                   = module.vpc.vpc_id
-  subnet_ids               = [module.vpc.private_subnets[0]]
-  control_plane_subnet_ids = module.vpc.private_subnets
+  subnet_ids               = [module.vpc.public_subnets[0]]
+  control_plane_subnet_ids = module.vpc.public_subnets
 
   endpoint_public_access       = true
   endpoint_public_access_cidrs = var.allowed_cidrs
   endpoint_private_access      = true
 
   addons = {
-    eks-pod-identity-agent = {
-      before_compute = true
-    }
     vpc-cni = {
       before_compute = true
     }
-    coredns    = {}
-    kube-proxy = {}
+    metrics-server = {}
+    coredns        = {}
+    kube-proxy     = {}
   }
 
   authentication_mode                      = "API_AND_CONFIG_MAP"
@@ -140,11 +140,12 @@ module "eks" {
     app = {
       name           = "ng-app"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["t3a.medium"]
       capacity_type  = "ON_DEMAND"
-      desired_size   = 2
-      max_size       = 2
-      min_size       = 2
+      desired_size   = 3
+      max_size       = 3
+      min_size       = 3
+      subnet_ids     = [module.vpc.public_subnets[0]]
       labels = {
         "workload" = "app"
       }
@@ -155,13 +156,15 @@ module "eks" {
     db = {
       name           = "ng-db"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["t3a.small"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1
       min_size       = 1
+      subnet_ids     = [module.vpc.public_subnets[0]]
       labels = {
         "workload" = "db"
+        "edge"     = "ingress"
       }
       tags = local.tags
     }
@@ -170,11 +173,12 @@ module "eks" {
     adaptation = {
       name           = "ng-adaptation"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["t3a.small"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1
       min_size       = 1
+      subnet_ids     = [module.vpc.public_subnets[0]]
       labels = {
         "workload" = "adaptation"
       }
@@ -184,14 +188,14 @@ module "eks" {
     monitoring = {
       name           = "ng-monitoring"
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.small"]
+      instance_types = ["t3a.small"]
       capacity_type  = "ON_DEMAND"
       desired_size   = 1
       max_size       = 1
       min_size       = 1
+      subnet_ids     = [module.vpc.public_subnets[0]]
       labels = {
         "workload" = "monitoring"
-        "edge"     = "ingress"
       }
       tags = local.tags
     }
@@ -207,10 +211,10 @@ module "eks" {
       source_security_group_id = module.eks.node_security_group_id
     }
     allow_http_from_k6 = {
-      description              = "Allow HTTP from k6 on 30080"
+      description              = "Allow HTTP from k6 to ingress and prometheus"
       protocol                 = "tcp"
       from_port                = 30080
-      to_port                  = 30080
+      to_port                  = 30081
       type                     = "ingress"
       source_security_group_id = module.ec2_k6.security_group_id
     }
@@ -285,6 +289,18 @@ resource "null_resource" "wait_for_coredns" {
 
 resource "aws_ecr_repository" "znn" {
   name                 = "${var.cluster_name}/znn"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+}
+
+resource "aws_ecr_repository" "custom-self-adapter-operator" {
+  name                 = "${var.cluster_name}/csa-operator"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+}
+
+resource "aws_ecr_repository" "custom-self-adapter-quality" {
+  name                 = "${var.cluster_name}/csa-quality-znn"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 }

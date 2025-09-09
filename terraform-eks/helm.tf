@@ -1,15 +1,22 @@
-resource "helm_release" "metrics_server" {
-  name       = "metrics-server"
-  repository = "https://kubernetes-sigs.github.io/metrics-server/"
-  chart      = "metrics-server"
-  # Fixe uma versão estável do chart (ex.: 3.13.0 no momento da escrita)
-  version    = "3.13.0"
-  depends_on = [null_resource.wait_for_coredns]
+# resource "helm_release" "metrics_server" {
+#   name       = "metrics-server"
+#   repository = "https://kubernetes-sigs.github.io/metrics-server/"
+#   chart      = "metrics-server"
+#   # Fixe uma versão estável do chart (ex.: 3.13.0 no momento da escrita)
+#   version    = "3.13.0"
+#   depends_on = [null_resource.wait_for_coredns]
 
-  namespace        = "kube-system"
-  create_namespace = false
+#   namespace        = "kube-system"
+#   create_namespace = false
 
-}
+#   values = [
+#     yamlencode({
+#       nodeSelector = {
+#         workload = "monitoring"
+#       }
+#     })
+#   ]
+# }
 
 resource "helm_release" "ingress_nginx" {
   name             = "ingress-nginx"

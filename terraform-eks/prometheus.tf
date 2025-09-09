@@ -22,9 +22,16 @@ resource "helm_release" "kube_prometheus_stack" {
       }
       prometheus = {
         prometheusSpec = {
+          scrapeInterval            = "5s"
+          enableRemoteWriteReceiver = "true"
           nodeSelector = {
             workload = "monitoring"
           }
+        }
+        service = {
+          type     = "NodePort"
+          nodePort = 30081
+          port     = 9090
         }
       }
     })
@@ -74,12 +81,14 @@ resource "helm_release" "prometheus_adapter" {
           }
         ]
       }
+      nodeSelector = {
+        edge = "ingress"
+      }
     })
   ]
 
   depends_on = [
-    helm_release.kube_prometheus_stack,
-    helm_release.ingress_nginx
+    helm_release.kube_prometheus_stack
   ]
 }
 

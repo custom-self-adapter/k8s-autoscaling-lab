@@ -20,3 +20,6 @@ resources:
   limits:
     cpu: 200m
     memory: 256Mi
+
+nodeSelector:
+  ingress: "yes"

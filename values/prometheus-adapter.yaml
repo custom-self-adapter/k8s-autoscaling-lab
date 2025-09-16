@@ -1,3 +1,6 @@
+nodeSelector:
+  monitoring: "yes"
+
 prometheus:
   url: http://kube-prometheus-stack-prometheus.monitoring
 
@@ -11,7 +14,7 @@ rules:
           exported_namespace:
             resource: "namespace"
       name:
-        as: frontend_latency_p95_ms
+        as: nginx_ingress_p95_ms
       metricsQuery: >
         histogram_quantile(
           0.95,

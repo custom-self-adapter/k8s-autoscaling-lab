@@ -1,3 +1,6 @@
+prometheusOperator:
+  nodeSelector:
+    monitoring: "yes"
 prometheus:
   ingress:
     enabled: true
@@ -6,7 +9,9 @@ prometheus:
       - prometheus.k8s.lab
   prometheusSpec:
     enableRemoteWriteReceiver: true
-    maximumStartupDurationSeconds: 120
+    scrapeInterval: 5s
+    nodeSelector:
+      monitoring: "yes"
   service:
     type: LoadBalancer
     loadBalancerIP: 10.0.0.17

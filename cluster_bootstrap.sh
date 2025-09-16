@@ -2,6 +2,12 @@
 
 VAGRANT_CERTS='vagrant-kubeadm-kubernetes/certs'
 
+kubectl label node node01 app=yes
+kubectl label node node02 db=yes
+kubectl label node node02 adaptation=yes
+kubectl label node node02 ingress=yes
+kubectl label node node03 monitoring=yes
+
 helmfile sync
 
 kubectl apply -f bootstrapping/ipaddresspool.yaml

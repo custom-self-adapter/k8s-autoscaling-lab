@@ -1,3 +1,5 @@
+nodeSelector:
+  ingress: "yes"
 controller:
   progressDeadlineSeconds: 30
   ingressClassResource:

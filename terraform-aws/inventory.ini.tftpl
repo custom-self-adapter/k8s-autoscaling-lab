@@ -1,0 +1,22 @@
+# Requer: ansible-galaxy collection install amazon.aws
+# Executar com: ansible-playbook -i inventory.ini cluster.yml
+
+[all:vars]
+ansible_connection=aws_ssm
+ansible_aws_ssm_region=${region}
+ansible_user=ssm-user
+
+[kube_control_plane]
+cp ansible_host=${cp_ip}
+
+[etcd]
+cp
+
+[kube_node]
+%{ for w in workers ~}
+node-${w.pool} ansible_host=${w.ip} node_labels=${jsonencode(w.labels)}
+%{ endfor ~}
+
+[k8s_cluster:children]
+kube_control_plane
+kube_node

@@ -3,7 +3,7 @@
 set -euxo pipefail
 
 dnf update -y
-dnf install -y curl-minimal git tar gzip make gcc
+dnf install -y curl-minimal git tar gzip make gcc amazon-ssm-agent
 
 GO_VERSION=${go_version}
 REPO_PATH=/opt/k8s-autoscaling-lab

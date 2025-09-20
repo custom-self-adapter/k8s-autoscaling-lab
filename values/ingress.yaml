@@ -1,6 +1,6 @@
-nodeSelector:
-  ingress: "yes"
 controller:
+  nodeSelector:
+    ingress: "yes"
   progressDeadlineSeconds: 30
   ingressClassResource:
     name: nginx

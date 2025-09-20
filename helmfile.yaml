@@ -21,6 +21,14 @@ releases:
       - crds:
           enabled: true
           keep: false
+        nodeSelector:
+          cert: "yes"
+        webhook:
+          nodeSelector:
+            cert: "yes"
+        cainjector:
+          nodeSelector:
+            cert: "yes"
 
   - name: metallb
     chart: metallb/metallb
@@ -60,11 +68,11 @@ releases:
     values:
       - values/prometheus-adapter.yaml
 
-  - name: cpa-operator
-    namespace: cpa-operator
-    chart: charts/custom-pod-autoscaler-operator
-    version: v1.4.2
-    values: []
+  # - name: cpa-operator
+  #   namespace: cpa-operator
+  #   chart: charts/custom-pod-autoscaler-operator
+  #   version: v1.4.2
+  #   values: []
 
   # - name: online-boutique
   #   namespace: boutique

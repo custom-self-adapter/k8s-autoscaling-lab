@@ -1,6 +1,10 @@
 prometheusOperator:
   nodeSelector:
     monitoring: "yes"
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector:
+      monitoring: "yes"
 prometheus:
   ingress:
     enabled: true

@@ -13,6 +13,8 @@ rules:
         overrides:
           exported_namespace:
             resource: "namespace"
+          ingress:
+            resource: "ingress"
       name:
         as: nginx_ingress_p95_ms
       metricsQuery: >
@@ -22,3 +24,21 @@ rules:
             <<.Series>>{<<.LabelMatchers>>}[1m]
           )) by (le)
         ) * 1000
+    - seriesQuery: 'nginx_ingress_controller_request_duration_seconds_count{ingress!=""}'
+      resources:
+        overrides:
+          exported_namespace:
+            resource: "namespace"
+          ingress:
+            resource: "ingress"
+      name:
+        as: "nginx_ingress_avg_ms"
+      metricsQuery: |
+        sum by (ingress, exported_namespace) (
+          rate(nginx_ingress_controller_request_duration_seconds_sum{<<.LabelMatchers>>}[1m])
+        )
+        /
+        sum by (ingress, exported_namespace) (
+          rate(nginx_ingress_controller_request_duration_seconds_count{<<.LabelMatchers>>}[1m])
+        ) * 1000
+

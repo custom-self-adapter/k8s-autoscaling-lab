@@ -70,16 +70,15 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "#EAB839",
-                "value": 4500
+                "value": 1000
               },
               {
                 "color": "red",
-                "value": 5000
+                "value": 2000
               }
             ]
           }
@@ -135,7 +134,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -143,8 +142,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(\n                0.95,\n                sum(rate(nginx_ingress_controller_request_duration_seconds_bucket{ingress=\"kube-znn\"}[1m]))\n                by (le, ingress, exported_namespace)\n              ) * 1000",
-          "legendFormat": "ingress-nginx request duration",
+          "expr": "1000 *\nsum by (ingress, exported_namespace) (\n  rate(nginx_ingress_controller_request_duration_seconds_sum{exported_namespace=\"default\"}[1m])\n)\n/\nsum by (ingress, exported_namespace) (\n  rate(nginx_ingress_controller_request_duration_seconds_count{exported_namespace=\"default\"}[1m])\n)\n",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "ingress-nginx avg request duration",
           "range": true,
           "refId": "A"
         },
@@ -154,8 +155,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "sum(rate(k6_http_reqs_total[$__rate_interval]))",
+          "editorMode": "code",
+          "expr": "sum(rate(k6_http_reqs_total[1m]))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -217,8 +218,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "green"
               },
               {
                 "color": "red",
@@ -249,7 +249,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.1.1",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "editorMode": "code",
@@ -278,5 +278,5 @@
   "timezone": "browser",
   "title": "kube-znn",
   "uid": "c7ea10d9-635b-4e67-a062-d8e8829fa6c6",
-  "version": 4
+  "version": 2
 }

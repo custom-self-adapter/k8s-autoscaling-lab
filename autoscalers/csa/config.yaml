@@ -4,34 +4,41 @@ metric:
   shell:
     entrypoint: "python"
     command:
-      - "/scripts/metric_frontend_latency.py"
+      - "/scripts/metric_nginx_req_duration.py"
     logStderr: true
 evaluate:
   type: "shell"
-  timeout: 1000
+  timeout: 2000
   shell:
     entrypoint: "python"
     command:
       - "/scripts/evaluate.py"
 adapt:
-  scale_cpu_replicas:
+  adapt_replicas:
     type: "shell"
-    timeout: 2000
+    timeout: 1000
     shell:
       entrypoint: "python"
       command:
-        - "/scripts/scale_cpu_replicas.py"
+        - "/scripts/adapt_replicas.py"
+  adapt_tag:
+    type: "shell"
+    timeout: 1000
+    shell:
+      entrypoint: "python"
+      command:
+        - "/scripts/adapt_tag.py"
 kubernetesMetricSpecs:
   - type: External
     external:
       metric:
-        name: frontend_latency_p95_ms
+        name: nginx_ingress_avg_ms
         selector:
           matchLabels:
             ingress: "kube-znn"
       target:
         type: Value
-        value: "4500m"
+        value: "2400m"
 interval: 15000
 minReplicas: 1
 maxReplicas: 10

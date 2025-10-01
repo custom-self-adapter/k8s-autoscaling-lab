@@ -5,12 +5,11 @@ from adapter_logger import AdapterLogger
 
 
 def main(spec_raw: str):
-    logger = AdapterLogger("metric")
+    logger = AdapterLogger("metric").logger
 
     spec = json.loads(spec_raw)
 
-    logger.logger.info("Starting metric script")
-    logger.logger.info(spec.keys())
+    logger.info("Starting metric script")
     kmetrics = spec["kubernetesMetrics"][0]
     current_replicas = spec['resource']['spec']['replicas']
     target_value = kmetrics['spec']['external']['target']['value']
@@ -19,13 +18,12 @@ def main(spec_raw: str):
     metrics_result = json.dumps(
         {
             "current_replicas": current_replicas,
-            "target_latency": target_value,
-            "current_latency": current_value
+            "target_value": target_value,
+            "current_value": current_value
         }
     )
 
     sys.stdout.write(metrics_result)
-
 
 
 if __name__ == "__main__":

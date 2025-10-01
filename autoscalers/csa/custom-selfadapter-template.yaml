@@ -6,10 +6,19 @@ metadata:
 spec:
   template:
     spec:
+      nodeSelector:
+        adaptation: "yes"
       containers:
         - name: csa-quality-znn
-          image: registry.k8s.lab/csa-quality-znn:${TAG}
+          image: ${IMAGE}:${TAG}
           imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "512m"
+              memory: "128Mi"
+            limits:
+              cpu: "1024m"
+              memory: "1024Mi"
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment

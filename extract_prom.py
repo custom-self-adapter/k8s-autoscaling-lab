@@ -44,7 +44,7 @@ now = datetime.now(timezone.utc)
 START = int((now - timedelta(minutes=7)).timestamp())
 END   = int(now.timestamp())
 # Prometheus scrape interval
-STEP  = "15s"
+STEP  = "5s"
 
 def query_range(prom_url, promql, start, end, step):
     r = requests.get(

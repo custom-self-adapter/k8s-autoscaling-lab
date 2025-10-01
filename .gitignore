@@ -1,5 +1,6 @@
 k6
 venv
+.venv
 
 .terraform/
 .terraform.lock.hcl

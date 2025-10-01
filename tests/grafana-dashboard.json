@@ -74,11 +74,11 @@
               },
               {
                 "color": "#EAB839",
-                "value": 1000
+                "value": 2400
               },
               {
                 "color": "red",
-                "value": 2000
+                "value": 3000
               }
             ]
           }
@@ -278,5 +278,5 @@
   "timezone": "browser",
   "title": "kube-znn",
   "uid": "c7ea10d9-635b-4e67-a062-d8e8829fa6c6",
-  "version": 2
+  "version": 3
 }

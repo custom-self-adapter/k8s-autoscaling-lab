@@ -7,23 +7,6 @@ prometheus:
 rules:
   default: false
   external:
-    - seriesQuery: '{__name__="nginx_ingress_controller_request_duration_seconds_bucket",namespace!=""}'
-      resources:
-        template: <<.Resource>>
-        overrides:
-          exported_namespace:
-            resource: "namespace"
-          ingress:
-            resource: "ingress"
-      name:
-        as: nginx_ingress_p95_ms
-      metricsQuery: >
-        histogram_quantile(
-          0.95,
-          sum(rate(
-            <<.Series>>{<<.LabelMatchers>>}[1m]
-          )) by (le)
-        ) * 1000
     - seriesQuery: 'nginx_ingress_controller_request_duration_seconds_count{ingress!=""}'
       resources:
         overrides:
@@ -41,4 +24,18 @@ rules:
         sum by (ingress, exported_namespace) (
           rate(nginx_ingress_controller_request_duration_seconds_count{<<.LabelMatchers>>}[1m])
         ) * 1000
+    - seriesQuery: 'request_duration_seconds_sum{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: "namespace"
+          pod:
+            resource: "pod"
+      name:
+        as: "znn_latency_ms_average"
+      metricsQuery: >
+        1000 *
+        sum(rate(request_duration_seconds_sum{host="znn"}[30s]))
+        /
+        sum(rate(request_duration_seconds_count{host="znn"}[30s]))
 

@@ -1,6 +1,7 @@
 k6
 venv
 .venv
+__pycache__
 
 .terraform/
 .terraform.lock.hcl

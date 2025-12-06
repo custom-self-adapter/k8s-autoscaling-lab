@@ -19,7 +19,7 @@ def build_queries(ns: str):
     """.strip()
 
     requests_per_second = """sum(rate(requests_total{host="znn"}[5m]))"""
-    
+
     error_rate = """sum(rate(requests_total{host="znn", status="200"}[5m]))/sum(rate(requests_total{host="znn"}[5m]))"""
 
     znn_pods_per_tag = f"""
@@ -99,7 +99,7 @@ def results_to_df(result_json, series_name):
     return pd.DataFrame(rows).sort_values("ts")
 
 
-def extract(user_count=None):
+def extract(user_count=None, response_time=None, response_size=None, response_code=None):
     logging.basicConfig(format="[%(asctime)s] %(name)s %(message)s", level=logging.INFO)
     ns = "default"
     window_minutes = 5
@@ -118,6 +118,12 @@ def extract(user_count=None):
 
     if user_count is not None:
         all_dfs.append(pd.DataFrame(user_count))
+    if response_time is not None:
+        all_dfs.append(pd.DataFrame(response_time).sort_values('ts'))
+    if response_size is not None:
+        all_dfs.append(pd.DataFrame(response_size).sort_values('ts'))
+    if response_code is not None:
+        all_dfs.append(pd.DataFrame(response_code).sort_values('ts'))
 
     data = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     csv_file = f"./tests/results/prom_extract_{now.strftime('%Y%m%d%H%M')}.csv"

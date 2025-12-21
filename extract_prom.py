@@ -8,6 +8,7 @@ import requests
 ca_bundle_path = "vagrant-kubeadm-kubernetes/certs/rootCA.crt"
 
 PROM_URL = "https://prometheus.k8s.lab"
+SLO_SECONDS = 1.0
 
 
 def build_queries(ns: str):
@@ -56,12 +57,31 @@ def build_queries(ns: str):
     )
     """
 
+    slo_breach_pct = f"""
+    100 *
+    (
+        1 -
+        sum(rate(request_duration_seconds_bucket{{host="znn", le="{SLO_SECONDS:.1f}"}}[5m]))
+        /
+        sum(rate(request_duration_seconds_count{{host="znn"}}[5m]))
+    )
+    """
+
+    success_within_slo_pct = f"""
+    100 *
+    sum(rate(request_duration_seconds_bucket{{host="znn", status="200", le="{SLO_SECONDS:.1f}"}}[5m]))
+    /
+    sum(rate(requests_total{{host="znn", status="200"}}[5m]))
+    """
+
     return {
         "req_duration_avg_ms": req_duration_avg_ms,
         "requests_per_second": requests_per_second,
         "error_rate": error_rate,
         "znn_pods_per_tag": znn_pods_per_tag,
         "avg_response_size": avg_response_size,
+        "slo_breach_pct": slo_breach_pct,
+        "success_within_slo_pct": success_within_slo_pct,
     }
 
 
@@ -99,7 +119,7 @@ def results_to_df(result_json, series_name):
     return pd.DataFrame(rows).sort_values("ts")
 
 
-def extract(user_count=None, response_time=None, response_size=None, response_code=None):
+def extract(user_count=None, response_time=None):
     logging.basicConfig(format="[%(asctime)s] %(name)s %(message)s", level=logging.INFO)
     ns = "default"
     window_minutes = 5
@@ -119,11 +139,7 @@ def extract(user_count=None, response_time=None, response_size=None, response_co
     if user_count is not None:
         all_dfs.append(pd.DataFrame(user_count))
     if response_time is not None:
-        all_dfs.append(pd.DataFrame(response_time).sort_values('ts'))
-    if response_size is not None:
-        all_dfs.append(pd.DataFrame(response_size).sort_values('ts'))
-    if response_code is not None:
-        all_dfs.append(pd.DataFrame(response_code).sort_values('ts'))
+        all_dfs.append(pd.DataFrame(response_time).sort_values("ts"))
 
     data = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     csv_file = f"./tests/results/prom_extract_{now.strftime('%Y%m%d%H%M')}.csv"

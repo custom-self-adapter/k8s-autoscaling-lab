@@ -151,8 +151,7 @@ class DoubleWave(LoadTestShape):
                 return tick_data
 
         extract(
-            user_count=self.user_count,
-            response_time=stats.get_response_time_rows()
+            user_count=self.user_count, response_time=stats.get_response_time_rows()
         )
         return None
 

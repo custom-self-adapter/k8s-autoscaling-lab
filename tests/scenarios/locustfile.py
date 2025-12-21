@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import override
 
@@ -16,16 +17,86 @@ def get_timestamp():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S%z")
 
 
+@dataclass(frozen=True)
+class Stats:
+    ts: str
+    response_time: float
+    response_length: int
+    status_code: int
+
+    @staticmethod
+    def from_dict(row: dict):
+        try:
+            return Stats(
+                ts=row["ts"],
+                response_time=float(row["response_time"]),
+                response_length=int(row["response_length"]),
+                status_code=int(row["status_code"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def as_response_time_row(self) -> dict:
+        return {
+            "ts": self.ts,
+            "series": "response_time",
+            "value": self.response_time,
+            "response_size": self.response_length,
+            "status_code": self.status_code,
+        }
+
+    def key(self) -> tuple:
+        return (self.ts, self.response_time, self.response_length, self.status_code)
+
+
 class StatsStore:
     def __init__(self) -> None:
-        self.response_time = []
-        self.response_size = []
-        self.response_code = []
-    
+        self._entries: dict[tuple, Stats] = {}
+
     def reset(self):
-        self.response_time = []
-        self.response_size = []
-        self.response_code = []
+        self._entries.clear()
+
+    def add_request(
+        self,
+        timestamp: str,
+        response_time: float,
+        response_length: int,
+        status_code: int,
+    ):
+        try:
+            entry = Stats(
+                ts=timestamp,
+                response_time=float(response_time),
+                response_length=int(response_length),
+                status_code=int(status_code),
+            )
+        except (TypeError, ValueError):
+            return
+        self._entries[entry.key()] = entry
+
+    def extend_entries(self, rows: list[dict]):
+        for row in rows or []:
+            entry = Stats.from_dict(row)
+            if entry is None:
+                continue
+            self._entries[entry.key()] = entry
+
+    def get_entries(self, consume: bool = False):
+        rows = [
+            {
+                "ts": s.ts,
+                "response_time": s.response_time,
+                "response_length": s.response_length,
+                "status_code": s.status_code,
+            }
+            for s in self._entries.values()
+        ]
+        if consume:
+            self._entries.clear()
+        return rows
+
+    def get_response_time_rows(self):
+        return [s.as_response_time_row() for s in self._entries.values()]
 
 
 stats = StatsStore()
@@ -48,9 +119,9 @@ class DoubleWave(LoadTestShape):
 
     stages: list[dict[str, int]] = [
         {"end": 30, "users": 20, "spawn_rate": 20},
-        {"end": 120, "users": 240, "spawn_rate": 5},
-        {"end": 180, "users": 120, "spawn_rate": 5},
-        {"end": 240, "users": 240, "spawn_rate": 25},
+        {"end": 120, "users": 250, "spawn_rate": 5},
+        {"end": 180, "users": 100, "spawn_rate": 5},
+        {"end": 240, "users": 250, "spawn_rate": 25},
         {"end": 300, "users": 20, "spawn_rate": 25},
     ]
 
@@ -81,9 +152,7 @@ class DoubleWave(LoadTestShape):
 
         extract(
             user_count=self.user_count,
-            response_time=stats.response_time,
-            response_size=stats.response_size,
-            response_code=stats.response_code
+            response_time=stats.get_response_time_rows()
         )
         return None
 
@@ -95,21 +164,20 @@ def on_test_stop(environment, **kwargs):
 
 @events.request.add_listener
 def on_request(
-    request_type, name, response_time, response_length, response, exception, context, **kwargs
+    request_type,
+    name,
+    response_time,
+    response_length,
+    response,
+    exception,
+    context,
+    **kwargs,
 ):
     """
     Register the response_time for each request
     """
     timestamp = get_timestamp()
-    stats.response_time.append(
-        {"ts": timestamp, "series": "response_time", "value": response_time}
-    )
-    stats.response_size.append(
-        {"ts": timestamp, "series": "response_size", "value": response_length}
-    )
-    stats.response_code.append(
-        {"ts": timestamp, "series": "response_code", "value": response.status_code}
-    )
+    stats.add_request(timestamp, response_time, response_length, response.status_code)
 
 
 @events.report_to_master.add_listener
@@ -117,12 +185,7 @@ def on_report_to_master(client_id, data):
     """
     Worker instance reports their response_time to master
     """
-    data["response_time"] = stats.response_time
-    data["response_size"] = stats.response_size
-    data["response_code"] = stats.response_code
-    stats.response_time = []
-    stats.response_size = []
-    stats.response_code = []
+    data["responses"] = stats.get_entries(consume=True)
 
 
 @events.worker_report.add_listener
@@ -130,6 +193,4 @@ def on_worker_report(client_id, data):
     """
     Master collects response_time from workers
     """
-    stats.response_time.extend(data["response_time"])
-    stats.response_size.extend(data["response_size"])
-    stats.response_code.extend(data["response_code"])
+    stats.extend_entries(data.get("responses", []))

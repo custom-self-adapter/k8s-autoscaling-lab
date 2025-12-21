@@ -32,15 +32,12 @@ kubernetesMetricSpecs:
   - type: External
     external:
       metric:
-        name: nginx_ingress_avg_ms
-        selector:
-          matchLabels:
-            ingress: "kube-znn"
+        name: znn_latency_ms_average
       target:
         type: Value
-        value: "2400m"
-interval: 15000
+        value: 1000
+interval: 5000
 minReplicas: 1
-maxReplicas: 10
+maxReplicas: 5
 requireKubernetesMetrics: true
 logVerbosity: 3

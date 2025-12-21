@@ -1,0 +1,27 @@
+[
+    {
+        "order": 0,
+        "scaling": "Baseline",
+        "file": "prom_extract_202512071258.csv"
+    },
+    {
+        "order": 1,
+        "scaling": "HPA Padrão",
+        "file": "prom_extract_202512071320.csv"
+    },
+    {
+        "order": 2,
+        "scaling": "HPA scaleDown rápido",
+        "file": "prom_extract_202512071308.csv"
+    },
+    {
+        "order": 3,
+        "scaling": "CSA apenas Horizontal",
+        "file": "prom_extract_202512071328.csv"
+    },
+    {
+        "order": 4,
+        "scaling": "CSA Horizontal e Qualidade",
+        "file": "prom_extract_202512061910.csv"
+    }
+]

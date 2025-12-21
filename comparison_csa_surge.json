@@ -1,0 +1,37 @@
+[
+    {
+        "order": 0,
+        "scaling": "Baseline",
+        "file": "prom_extract_202512071258.csv"
+    },
+    {
+        "order": 1,
+        "scaling": "HPA Padrão",
+        "file": "prom_extract_202512071320.csv"
+    },
+    {
+        "order": 2,
+        "scaling": "CSA apenas Horizontal",
+        "file": "prom_extract_202512071328.csv"
+    },
+    {
+        "order": 3,
+        "scaling": "CSA H+Q Surge 25%",
+        "file": "prom_extract_202512061910.csv"
+    },
+    {
+        "order": 4,
+        "scaling": "CSA H+Q Surge 50%",
+        "file": "prom_extract_202512061954.csv"
+    },
+    {
+         "order": 5,
+         "scaling": "CSA H+Q Surge 75%",
+         "file": "prom_extract_202512062004.csv"
+    },
+    {
+         "order": 6,
+         "scaling": "CSA H+Q Surge 100%",
+         "file": "prom_extract_202512062017.csv"
+    }
+]

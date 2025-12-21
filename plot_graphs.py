@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from mpl_toolkits.mplot3d.axes3d import mcolors
 
+from utils import format_size
+
 plt.style.use("bmh")
 plt.rcParams.update(
     {
@@ -42,7 +44,7 @@ data = pd.read_csv(file_name)
 DUR_SERIES = "req_duration_avg_ms"
 DUR_LABEL = "Duração das Requisições"
 RTM_SERIES = "response_time"
-RTM_LABEL = "Tempo de Resposta"
+RTM_LABEL = "Tempo de Resposta (ms)"
 USERS_SERIES = "user_count"
 USERS_LABEL = "Usuários Simultâneos"
 PODS_SERIES = "znn_pods_per_tag"
@@ -50,6 +52,15 @@ PODS_LABELS = "Pods por Tag"
 RESP_SIZE_SERIES = "avg_response_size"
 RESP_SIZE_LABEL = "Tamanho da Resposta"
 RESP_SIZE_SERIES_L = "response_size"
+RESP_CODE_SERIES = "response_code"
+RESP_CODE_LABEL = "Código de Resposta"
+
+# ==============================
+#  PARÂMETROS AJUSTÁVEIS
+# ==============================
+# Rolling mean window (number of samples) for response time smoothing.
+RTM_ROLLING_WINDOW = 100
+SLO_MILISECONDS = 1000
 
 # ==============================
 #  FUNÇÕES AUXILIARES
@@ -60,29 +71,14 @@ def _to_ts_utc(ts_like):
     return pd.to_datetime(ts_like, utc=True, errors="coerce")
 
 
-def to_rel_seconds(ts_like, t0):
+def to_rel_seconds(ts_like, ts_zero):
     ts = _to_ts_utc(ts_like)
-    delta = ts - _to_ts_utc(t0)
+    delta = ts - _to_ts_utc(ts_zero)
     if hasattr(delta, "dt"):
         return delta.dt.total_seconds().astype(float)
     if isinstance(delta, pd.TimedeltaIndex):
         return delta / np.timedelta64(1, "s")
     return float(delta.total_seconds())
-
-
-def format_size(v):
-    try:
-        v = float(v)
-    except Exception:
-        return "—"
-    if not np.isfinite(v):
-        return "—"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    i = 0
-    while v >= 1024 and i < len(units) - 1:
-        v /= 1024.0
-        i += 1
-    return f"{v:.2f} {units[i]}" if i else f"{int(v)} {units[i]}"
 
 
 def mmss_fmt(x, pos):
@@ -92,33 +88,65 @@ def mmss_fmt(x, pos):
     return f"{m:02d}:{s:02d}"
 
 
+def select_series(df, series_name, extra_cols=None):
+    cols = ["ts", "value"]
+    if extra_cols:
+        cols.extend([c for c in extra_cols if c in df.columns])
+    subset = df[df["series"] == series_name]
+    keep_cols = [c for c in cols if c in subset.columns]
+    series_df = subset[keep_cols].copy()
+    if "ts" in series_df.columns:
+        series_df = series_df.sort_values("ts")
+    return series_df
+
+
+def build_status_pivot(df_response_code):
+    if df_response_code.empty or "status_code" not in df_response_code.columns:
+        return None, 0.0
+    df_status = df_response_code.copy()
+    df_status["status_code"] = df_status["status_code"].astype(str)
+    pivot = df_status.pivot_table(
+        index="ts", columns="status_code", values="value", aggfunc="sum"
+    ).sort_index()
+    try:
+        max_count = float(np.nanmax(pivot.to_numpy())) if not pivot.empty else 0.0
+    except (ValueError, TypeError):
+        max_count = 0.0
+    return pivot, max_count
+
+
+def filter_http_success(df):
+    if df.empty or "status_code" not in df.columns:
+        return df
+    status = pd.to_numeric(df["status_code"], errors="coerce")
+    return df[status == 200]
+
+
 # ==============================
 #  PRÉ-PROCESSAMENTO
 # ==============================
-_df_dur = data[data["series"] == DUR_SERIES][["ts", "value"]].copy()
-_df_rtm = data[data["series"] == RTM_SERIES][["ts", "value"]].copy()
-_df_rtm.sort_values("ts")
-_df_usr = data[data["series"] == USERS_SERIES][["ts", "value"]].copy()
-_df_rsz = data[data["series"] == RESP_SIZE_SERIES][["ts", "value"]].copy()
-_df_rsz_l = data[data["series"] == RESP_SIZE_SERIES_L][["ts", "value"]].copy()
-_df_rsz_l.sort_values("ts")
-_df_pods = data[data["series"] == PODS_SERIES].copy()
-_pods_pivot = (
-    _df_pods.groupby(["ts", "tag"])["value"].sum().unstack("tag").sort_index()
-    if (not _df_pods.empty and "tag" in _df_pods.columns)
+df_duration = select_series(data, DUR_SERIES)
+df_resp_time = select_series(data, RTM_SERIES, extra_cols=["status_code"])
+df_users = select_series(data, USERS_SERIES)
+df_resp_size = select_series(data, RESP_SIZE_SERIES)
+df_pods = data[data["series"] == PODS_SERIES].copy()
+pivot_pods = (
+    df_pods.groupby(["ts", "tag"])["value"].sum().unstack("tag").sort_index()
+    if (not df_pods.empty and "tag" in df_pods.columns)
     else None
 )
+pivot_resp_code, max_resp_code_count = build_status_pivot(df_resp_time)
 
-_ts_min, _ts_max = [], []
-for d in (_df_dur, _df_rtm, _df_usr, _df_rsz):
-    if not d.empty:
-        _ts_min.append(d["ts"].min())
-        _ts_max.append(d["ts"].max())
-if _pods_pivot is not None and not _pods_pivot.empty:
-    _ts_min.append(_pods_pivot.index.min())
-    _ts_max.append(_pods_pivot.index.max())
+ts_min_values, ts_max_values = [], []
+for df_metric in (df_duration, df_resp_time, df_users, df_resp_size):
+    if not df_metric.empty:
+        ts_min_values.append(df_metric["ts"].min())
+        ts_max_values.append(df_metric["ts"].max())
+if pivot_pods is not None and not pivot_pods.empty:
+    ts_min_values.append(pivot_pods.index.min())
+    ts_max_values.append(pivot_pods.index.max())
 
-t0 = min(_ts_min) if _ts_min else pd.Timestamp.utcnow()
+ts_zero = min(ts_min_values) if ts_min_values else pd.Timestamp.utcnow()
 
 # ==============================
 #  CORES (exclusivas por métrica + degradê para pods)
@@ -129,6 +157,7 @@ COLORS_METRICS = {
     "RESP_TIME": "#8cd0ac",
     "USERS": "#1f77b4",
     "RESP_SIZE": "#7f7f7f",
+    "RESP_CODE": "#d62728",
 }
 # PODS_CMAP_NAME = "Dark2"
 PODS_BASE_COLOR = "#ff8888"
@@ -137,6 +166,15 @@ PODS_RED_DENOM = 1000.0
 PODS_RED_CLAMP = (0.10, 0.90)
 
 BASE_RBG = mcolors.to_rgb(PODS_BASE_COLOR)
+RESP_CODE_PALETTE = [
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+]
 
 
 def pods_color_from_tag(tag_str: str):
@@ -154,19 +192,29 @@ def pods_color_from_tag(tag_str: str):
     return (float(r), float(g), float(b))
 
 
+def resp_code_color(idx: int):
+    return RESP_CODE_PALETTE[idx % len(RESP_CODE_PALETTE)]
+
+
 # ==============================
 #  DIMENSIONAR ALTURA DA LEGENDA (todas as tags)
 # ==============================
 pods_count = 0
-if _pods_pivot is not None and not _pods_pivot.empty:
-    pods_count = _pods_pivot.shape[1]
+if pivot_pods is not None and not pivot_pods.empty:
+    pods_count = pivot_pods.shape[1]
+resp_code_lines = (
+    pivot_resp_code.shape[1]
+    if (pivot_resp_code is not None and not pivot_resp_code.empty)
+    else int(not df_resp_time.empty)
+)
 base_leg_items = (
     1
-    + int(not _df_dur.empty)
-    + int(not _df_rtm.empty)
-    + int(not _df_usr.empty)
-    + int(not _df_rsz.empty)
-)  # SLO + 3 métricas
+    + int(not df_duration.empty)
+    + int(not df_resp_time.empty)
+    + int(not df_users.empty)
+    + int(not df_resp_size.empty)
+    + resp_code_lines
+)  # SLO + métricas fixas
 _estimated = base_leg_items + pods_count
 if _estimated <= 12:
     ncols_guess = 4
@@ -181,7 +229,9 @@ legend_height = 0.5 * rows_guess
 #  FIGURA: 2 PLOTS (balanceados) + LEGENDA + TABELA
 # ==============================
 fig = plt.figure(figsize=(10, 7), layout="constrained")
-gs = fig.add_gridspec(nrows=5, ncols=1, height_ratios=[2.8, 2.8, legend_height, 1.5, 0.5])
+gs = fig.add_gridspec(
+    nrows=5, ncols=1, height_ratios=[2.8, 2.8, legend_height, 1.5, 0.5]
+)
 
 ax_top = fig.add_subplot(gs[0])
 ax_mid = fig.add_subplot(gs[1], sharex=ax_top)
@@ -200,10 +250,10 @@ legend_labels = []
 ax_top.set_title("Latência e Pods por Tag")
 ax_top.tick_params(labelbottom=False)
 
-if not _df_rtm.empty:
+if not df_resp_time.empty:
     (ln_rtm,) = ax_top.plot(
-        to_rel_seconds(_df_rtm["ts"], t0),
-        _df_rtm["value"],
+        to_rel_seconds(df_resp_time["ts"], ts_zero),
+        df_resp_time["value"],
         linewidth=1.0,
         color=COLORS_METRICS["RESP_TIME"],
     )
@@ -212,10 +262,10 @@ if not _df_rtm.empty:
 ax_top.set_ylim(0, 8000)
 ax_top.set_ylabel(RTM_LABEL)
 
-if not _df_dur.empty:
+if not df_duration.empty:
     (ln_dur,) = ax_top.plot(
-        to_rel_seconds(_df_dur["ts"], t0),
-        _df_dur["value"],
+        to_rel_seconds(df_duration["ts"], ts_zero),
+        df_duration["value"],
         linewidth=1.5,
         color=COLORS_METRICS["DURATION"],
     )
@@ -223,21 +273,26 @@ if not _df_dur.empty:
     legend_labels.append(DUR_LABEL)
 
 ln_slo = ax_top.axhline(
-    y=1000, linestyle=":", linewidth=1.3, color=COLORS_METRICS["SLO"], label="SLO (1s)"
+    y=SLO_MILISECONDS,
+    linestyle=":",
+    linewidth=1.3,
+    color=COLORS_METRICS["SLO"],
+    label="SLO (1s)",
 )
 legend_lines.append(ln_slo)
-legend_labels.append("SLO (1s)")
+legend_labels.append("SLO (1.5s)")
 
 ax_pods = ax_top.twinx()
+ax_pods.patch.set_visible(False)
 ax_pods.grid(False)
-if _pods_pivot is not None and not _pods_pivot.empty:
-    tags = sorted([str(c).zfill(4) for c in _pods_pivot.columns])
-    _pods_pivot = _pods_pivot.rename(columns=lambda c: str(c).zfill(4))
+if pivot_pods is not None and not pivot_pods.empty:
+    tags = sorted([str(c).zfill(4) for c in pivot_pods.columns])
+    pivot_pods = pivot_pods.rename(columns=lambda c: str(c).zfill(4))
     for tag in tags:
         color = pods_color_from_tag(tag)
         (ln_tag,) = ax_pods.plot(
-            to_rel_seconds(_pods_pivot.index, t0),
-            _pods_pivot[tag],
+            to_rel_seconds(pivot_pods.index, ts_zero),
+            pivot_pods[tag],
             linewidth=1.5,
             color=color,
             alpha=0.95,
@@ -253,10 +308,10 @@ ax_pods.set_ylim(0.5, 5.5)
 # ------------------------------
 ax_mid.set_title("Usuários e Tamanho das Respostas")
 
-if not _df_usr.empty:
+if not df_users.empty:
     (ln_users,) = ax_mid.plot(
-        to_rel_seconds(_df_usr["ts"], t0),
-        _df_usr["value"],
+        to_rel_seconds(df_users["ts"], ts_zero),
+        df_users["value"],
         label="Users",
         linewidth=1.5,
         color=COLORS_METRICS["USERS"],
@@ -267,24 +322,16 @@ ax_mid.set_ylabel(USERS_LABEL)
 
 ax_rsz = ax_mid.twinx()
 ax_rsz.grid(False)
-if not _df_rsz.empty:
+if not df_resp_size.empty:
     (ln_rsz,) = ax_rsz.plot(
-        to_rel_seconds(_df_rsz["ts"], t0),
-        _df_rsz["value"],
+        to_rel_seconds(df_resp_size["ts"], ts_zero),
+        df_resp_size["value"],
         label=RESP_SIZE_LABEL,
         linewidth=1.0,
         color=COLORS_METRICS["RESP_SIZE"],
     )
     legend_lines.append(ln_rsz)
     legend_labels.append("Response size")
-# if not _df_rsz_l.empty:
-#     (ln_rsz_l,) = ax_rsz.plot(
-#         to_rel_seconds(_df_rsz_l["ts"], t0),
-#         _df_rsz_l["value"],
-#         label="Response size (locust)",
-#         linewidth=1.0,
-#         color="#505050",
-#     )
 ax_rsz.set_ylabel("Response size")
 ax_rsz.yaxis.set_major_formatter(mtick.FuncFormatter(lambda v, p: format_size(v)))
 ax_rsz.set_ylim(0, 1_100_000)
@@ -312,20 +359,21 @@ ax_leg.legend(legend_lines, legend_labels, loc="center", ncols=ncols, frameon=Tr
 # ------------------------------
 ax_tbl.axis("off")
 
-breach_pct = (_df_dur["value"] > 1000).mean() * 100 if not _df_dur.empty else 0.0
-breach_pct_rtm = (_df_rtm["value"] > 1000).mean() * 100 if not _df_rtm.empty else 0.0
-pods_mean = _df_pods["value"].mean() if not _df_pods.empty else np.nan
-mean_rsz = _df_rsz["value"].mean() if not _df_rsz.empty else np.nan
+resp_time_success = filter_http_success(df_resp_time)
+breach_pct = (
+    (df_duration["value"] > SLO_MILISECONDS).mean() * 100
+    if not df_duration.empty
+    else 0.0
+)
+breach_pct_rtm = (
+    (resp_time_success["value"] > SLO_MILISECONDS).mean() * 100
+    if not resp_time_success.empty
+    else 0.0
+)
+pods_mean = df_pods["value"].mean() if not df_pods.empty else np.nan
+mean_rsz = df_resp_size["value"].mean() if not df_resp_size.empty else np.nan
 rows = [
-    (
-        "Tempo de resposta médio (prometheus)",
-        f"{_df_dur['value'].mean():.2f}" if not _df_dur.empty else "—",
-    ),
     ("% acima do SLO (prometheus)", f"{breach_pct:.2f}%"),
-    (
-        "Tempo de resposta médio (locust)",
-        f"{_df_rtm['value'].mean():.2f}" if not _df_rtm.empty else "-",
-    ),
     ("% acima do SLO (locust)", f"{breach_pct_rtm:.2f}%"),
     (
         "Quantidade média de Pods",
@@ -336,6 +384,16 @@ rows = [
         format_size(mean_rsz) if np.isfinite(mean_rsz) else "—",
     ),
 ]
+
+status_code_counts = (
+    df_resp_time.groupby("status_code")["value"].count()
+    if ("status_code" in df_resp_time.columns and not df_resp_time.empty)
+    else pd.Series(dtype=int)
+)
+for status_code, count in status_code_counts.items():
+    if status_code == 0:
+        continue
+    rows.append((f"Total HTTP {int(status_code)}", f"{count}"))
 
 cell_text = [[k, v] for k, v in rows]
 width = 0.6
@@ -348,7 +406,7 @@ tbl = ax_tbl.table(
 )
 try:
     tbl.auto_set_font_size(False)
-    tbl.set_fontsize(10)
+    tbl.set_fontsize(9)
 except Exception:
     pass
 

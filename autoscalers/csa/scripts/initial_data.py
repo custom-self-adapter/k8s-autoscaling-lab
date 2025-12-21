@@ -10,7 +10,7 @@ CSA_NAMESPACE = "CSA_NAMESPACE"
 ANNOTATION_TAG = "csa.custom-self-adapter.net/initialData"
 
 
-logger = AdapterLogger("initial_limits").logger
+logger = AdapterLogger("initial_data").logger
 config.load_incluster_config()
 coreV1 = client.CoreV1Api()
 appsV1 = client.AppsV1Api()
@@ -91,6 +91,27 @@ def store_tag(tag):
 
 def get_stored_tag():
     csa_status = get_csa_status()
-    if csa_status is not None and 'initialData' not in csa_status:
+    if csa_status is None:
+        return None
+    if csa_status is not None and ANNOTATION_TAG not in csa_status:
         return None
     return csa_status[ANNOTATION_TAG]['tag']
+
+
+def store_cpu_limit(cpu_limit):
+    stored_cpu_limit = get_stored_cpu_limit()
+    if stored_cpu_limit is not None:
+        return
+    
+    set_self_annotation(ANNOTATION_TAG, json.dumps({
+        'cpu_limit': cpu_limit
+    }))
+
+
+def get_stored_cpu_limit():
+    csa_status = get_csa_status()
+    if csa_status is None:
+        return None
+    if csa_status is not None and ANNOTATION_TAG not in csa_status:
+        return None
+    return csa_status[ANNOTATION_TAG]['cpu_limit']

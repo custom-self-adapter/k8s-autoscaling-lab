@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export IMAGE="registry.k8s.lab/csa-quality-znn"
-export TAG="v0.1.$(date +%Y%m%d%H%M)"
+export TAG="hq"
 
 docker build -t $IMAGE:$TAG .
 docker push $IMAGE:$TAG

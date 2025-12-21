@@ -4,15 +4,20 @@ Reads desired replica count from spec.evaluation.parameters.replicas (int),
 patches the Deployment, and outputs {"replicas": <final_value>}.
 """
 
+import json
 import sys
-from typing import Any
 
-from adapt_base import run, AdaptContext, StrategyResult
+from adapt_base import build_context
 
 
-def strategy(ctx: AdaptContext) -> StrategyResult | None:
-    """Scale the Deployment to the requested number of replicas or no-op on invalid params."""
-    params: dict[str, Any] = ctx.spec.get("evaluation", {}).get("parameters", {})
+def main(spec_raw: str) -> None:
+    ctx = build_context(spec_raw, logger_name="adapt_repl")
+    if ctx is None:
+        return
+    
+    ctx.logger.info("Starting adapt_replicas script")
+
+    params = ctx.spec.get("evaluation", {}).get("parameters", {})
     replicas = params.get("replicas")
 
     if not isinstance(replicas, int):
@@ -21,15 +26,14 @@ def strategy(ctx: AdaptContext) -> StrategyResult | None:
 
     ctx.logger.info(f"Scaling to {replicas} replicas")
     ctx.deployment.spec.replicas = replicas
-
-    def build_output(patched) -> dict[str, Any]:
-        return {"replicas": patched.spec.replicas}
-
-    return StrategyResult(should_patch=True, build_output=build_output)
-
-
-def main(spec_raw: str) -> None:
-    run(spec_raw, logger_name="adapt_repl", strategy=strategy)
+    try:
+        ctx.apps.patch_namespaced_deployment(
+            name=ctx.res_name, namespace=ctx.res_ns, body=ctx.deployment
+        )
+        sys.stdout.write(json.dumps({"replicas": replicas}))
+    except Exception as e:
+        ctx.logger.error(f"Failed to patch Deployment {ctx.res_ns}/{ctx.res_name}: {e}")
+        sys.stdout.write(json.dumps({"result": "error"}))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ import math
 import sys
 import yaml
 
+from kubernetes.utils.quantity import parse_quantity
+
 from adapter_logger import AdapterLogger
 from adapt_tag import PARAM_TAG_UP
 
@@ -12,7 +14,6 @@ STRATEGY_TAG = "adapt_tag"
 
 
 logger = AdapterLogger("evaluate").logger
-logger.info("Evaluate loading...")
 
 
 def load_config(configfile = '/config.yaml') -> dict | None:
@@ -46,8 +47,9 @@ def main(spec_raw: str):
     min_replicas = config['minReplicas'] if 'minReplicas' in config else 0
     max_replicas = config['maxReplicas'] if 'maxReplicas' in config else 0
 
-    current_value = metrics['current_value']
-    target_value = float(metrics['target_value'].rstrip('m')) * 1000
+    current_value = int(parse_quantity(metrics['current_value']))
+    target_value = int(parse_quantity(metrics['target_value'])) * 1000
+    logger.info(f"{current_value} / {target_value}")
     rate = current_value / target_value
 
     plan(resource, rate, min_replicas, max_replicas)
@@ -58,38 +60,34 @@ def plan(resource, rate, min_replicas, max_replicas):
 
     current_replicas = resource['spec']['replicas']
     # HPA Logic to scale replicas
+    desired_replicas = math.ceil(current_replicas * rate)
+    logger.info(f"calculated desired_replicas {desired_replicas}")
 
     if rate >= 1:
-        logger.info(f"rate above 1: {math.ceil(rate)}")
-        desired_replicas = current_replicas * math.ceil(rate)
-        logger.info(f"desired_replicas {desired_replicas}")
-
-        # Respects max_replicas
-        if desired_replicas > max_replicas:
-            desired_replicas = max_replicas
-
-        if desired_replicas > current_replicas:
+        if current_replicas != max_replicas:
+            # Respects max_replicas
+            desired_replicas = min(desired_replicas, max_replicas)
             write_evaluation(STRATEGY_REPLICAS, {
                 'replicas': desired_replicas
             })
         else:
+            # write_evaluation(STRATEGY_REPLICAS, {
+            #     'replicas': current_replicas
+            # })
             write_evaluation(STRATEGY_TAG, {
                 PARAM_TAG_UP: False
             })
     else:
-        logger.info(f"rate bellow 1: {rate}")
-        desired_replicas = math.ceil(current_replicas * rate)
-        logger.info(f"desired_replicas {desired_replicas}")
-        
-        # Respect min_replicas
-        if desired_replicas < min_replicas:
-            desired_replicas = min_replicas
-
-        if desired_replicas < current_replicas:
+        if current_replicas != min_replicas:
+            # Respect min_replicas
+            desired_replicas = max(desired_replicas, min_replicas)
             write_evaluation(STRATEGY_REPLICAS, {
                 'replicas': desired_replicas
             })
         else:
+            # write_evaluation(STRATEGY_REPLICAS, {
+            #     'replicas': current_replicas
+            # })
             write_evaluation(STRATEGY_TAG, {
                 PARAM_TAG_UP: True
             })

@@ -1,0 +1,179 @@
+{
+  "title": "Featured Test Results",
+  "sections": [
+    {
+      "title": "Baseline - no Autoscaling",
+      "items": [
+        {
+          "csv": "prom_extract_202601061948",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 1,
+            "quality": "800k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601061954",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 3,
+            "quality": "800k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062001",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 5,
+            "quality": "800k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062007",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 1,
+            "quality": "400k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062013",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 3,
+            "quality": "400k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062019",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 5,
+            "quality": "400k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062025",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 1,
+            "quality": "200k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062032",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 3,
+            "quality": "200k"
+          }
+        },
+        {
+          "csv": "prom_extract_202601062038",
+          "attributes": {
+            "scenario": "baseline",
+            "autoscaler": "none",
+            "replicas": 5,
+            "quality": "200k"
+          }
+        }
+      ]
+    },
+    {
+      "title": "HPA Default Behavior",
+      "items": [
+        {
+          "csv": "prom_extract_202601062044",
+          "attributes": {
+            "scenario": "hpa",
+            "autoscaler": "hpa",
+            "behavior": "default",
+            "quality": "800k"
+          }
+        }
+      ]
+    },
+    {
+      "title": "HPA Behavior fast scaleDown",
+      "note": "*stabilizationWindowSeconds=10*",
+      "items": [
+        {
+          "csv": "prom_extract_202601062050",
+          "attributes": {
+            "scenario": "hpa",
+            "autoscaler": "hpa",
+            "behavior": "fast_scale_down",
+            "stabilizationWindowSeconds": 10,
+            "quality": "800k"
+          }
+        }
+      ]
+    },
+    {
+      "title": "CSA Horizontal (HPA-like)",
+      "items": [
+        {
+          "csv": "prom_extract_202601062057",
+          "attributes": {
+            "scenario": "csa",
+            "autoscaler": "csa",
+            "mode": "horizontal"
+          }
+        }
+      ]
+    },
+    {
+      "title": "CSA Horizontal + Quality",
+      "items": [
+        {
+          "csv": "prom_extract_202601062103",
+          "attributes": {
+            "scenario": "csa",
+            "autoscaler": "csa",
+            "mode": "horizontal_quality",
+            "maxSurgePct": 25,
+            "maxUnavailablePct": 25
+          }
+        },
+        {
+          "csv": "prom_extract_202601062109",
+          "attributes": {
+            "scenario": "csa",
+            "autoscaler": "csa",
+            "mode": "horizontal_quality",
+            "maxSurgePct": 50,
+            "maxUnavailablePct": 50
+          }
+        },
+        {
+          "csv": "prom_extract_202601062115",
+          "attributes": {
+            "scenario": "csa",
+            "autoscaler": "csa",
+            "mode": "horizontal_quality",
+            "maxSurgePct": 75,
+            "maxUnavailablePct": 75
+          }
+        },
+        {
+          "csv": "prom_extract_202601062121",
+          "attributes": {
+            "scenario": "csa",
+            "autoscaler": "csa",
+            "mode": "horizontal_quality",
+            "maxSurgePct": 100,
+            "maxUnavailablePct": 100
+          }
+        }
+      ]
+    }
+  ]
+}

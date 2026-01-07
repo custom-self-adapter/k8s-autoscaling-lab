@@ -119,9 +119,9 @@ class DoubleWave(LoadTestShape):
 
     stages: list[dict[str, int]] = [
         {"end": 30, "users": 20, "spawn_rate": 20},
-        {"end": 120, "users": 250, "spawn_rate": 5},
-        {"end": 180, "users": 100, "spawn_rate": 5},
-        {"end": 240, "users": 250, "spawn_rate": 25},
+        {"end": 120, "users": 300, "spawn_rate": 8},
+        {"end": 210, "users": 150, "spawn_rate": 8},
+        {"end": 270, "users": 300, "spawn_rate": 25},
         {"end": 300, "users": 20, "spawn_rate": 25},
     ]
 
@@ -133,20 +133,17 @@ class DoubleWave(LoadTestShape):
 
     @override
     def tick(self):
-        run_time = self.get_run_time()
-        self.logger.info(
-            f"run_time: {run_time}; user_count: {self.get_current_user_count()}"
+        self.user_count.append(
+            {
+                "ts": get_timestamp(),
+                "value": self.get_current_user_count(),
+                "series": "user_count",
+            }
         )
 
+        run_time = self.get_run_time()
         for stage in self.stages:
             if run_time < stage["end"]:
-                self.user_count.append(
-                    {
-                        "ts": get_timestamp(),
-                        "value": self.get_current_user_count(),
-                        "series": "user_count",
-                    }
-                )
                 tick_data = (stage["users"], stage["spawn_rate"])
                 return tick_data
 

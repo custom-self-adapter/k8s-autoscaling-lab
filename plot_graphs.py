@@ -25,6 +25,7 @@ plt.rcParams.update(
 #  ENTRADA DE DADOS
 # ==============================
 arg_file = sys.argv[1] if len(sys.argv) > 1 else None
+arg_output = sys.argv[2] if len(sys.argv) > 2 else None
 if arg_file and Path(arg_file).is_file():
     file_name = arg_file
 else:
@@ -37,6 +38,9 @@ else:
         )
     file_name = max(candidates)
 print(f"Lendo dados de {file_name}")
+output_path = Path(arg_output) if arg_output else Path(file_name).with_suffix(".png")
+output_path.parent.mkdir(parents=True, exist_ok=True)
+print(f"Salvando plot em {output_path}")
 
 data = pd.read_csv(file_name)
 
@@ -54,6 +58,8 @@ RESP_SIZE_LABEL = "Tamanho da Resposta"
 RESP_SIZE_SERIES_L = "response_size"
 RESP_CODE_SERIES = "response_code"
 RESP_CODE_LABEL = "Código de Resposta"
+SLO_BREACH_SERIES = "slo_breach_pct"
+SLO_BREACH_200_SERIES = "slo_breach_success_pct"
 
 # ==============================
 #  PARÂMETROS AJUSTÁVEIS
@@ -136,6 +142,9 @@ pivot_pods = (
     else None
 )
 pivot_resp_code, max_resp_code_count = build_status_pivot(df_resp_time)
+
+df_slo_breach = select_series(data, SLO_BREACH_SERIES)
+df_slo_breach_200 = select_series(data, SLO_BREACH_200_SERIES)
 
 ts_min_values, ts_max_values = [], []
 for df_metric in (df_duration, df_resp_time, df_users, df_resp_size):
@@ -359,22 +368,31 @@ ax_leg.legend(legend_lines, legend_labels, loc="center", ncols=ncols, frameon=Tr
 # ------------------------------
 ax_tbl.axis("off")
 
-resp_time_success = filter_http_success(df_resp_time)
-breach_pct = (
-    (df_duration["value"] > SLO_MILISECONDS).mean() * 100
-    if not df_duration.empty
-    else 0.0
+df_resp_time_success = filter_http_success(df_resp_time)
+print(df_resp_time[df_resp_time["value"] > SLO_MILISECONDS])
+
+print(
+    df_duration[df_duration["value"] > SLO_MILISECONDS]["value"].count()
+    / df_duration["value"].count()
 )
-breach_pct_rtm = (
-    (resp_time_success["value"] > SLO_MILISECONDS).mean() * 100
-    if not resp_time_success.empty
-    else 0.0
+print(
+    df_resp_time[df_resp_time["value"] > SLO_MILISECONDS]["value"].count()
+    / df_resp_time["value"].count()
 )
+print(
+    df_resp_time_success[df_resp_time_success["value"] > SLO_MILISECONDS][
+        "value"
+    ].count()
+    / df_resp_time_success["value"].count()
+)
+
+breach_pct = df_slo_breach["value"].iloc[-1]
+breach_pct_200 = df_slo_breach_200["value"].iloc[-1]
 pods_mean = df_pods["value"].mean() if not df_pods.empty else np.nan
 mean_rsz = df_resp_size["value"].mean() if not df_resp_size.empty else np.nan
 rows = [
-    ("% acima do SLO (prometheus)", f"{breach_pct:.2f}%"),
-    ("% acima do SLO (locust)", f"{breach_pct_rtm:.2f}%"),
+    ("% acima do SLO", f"{breach_pct:.2f}%"),
+    ("% acima do SLO (sucesso)", f"{breach_pct_200:.2f}%"),
     (
         "Quantidade média de Pods",
         f"{pods_mean:.2f}" if np.isfinite(pods_mean) else "—",
@@ -414,4 +432,5 @@ except Exception:
 fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.03, hspace=0.03)
 
 if __name__ == "__main__":
-    plt.show()
+    fig.savefig(output_path)
+    plt.close(fig)

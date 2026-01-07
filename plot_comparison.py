@@ -56,22 +56,6 @@ def align_to_pods(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-slo_breaches = (
-    full_df[full_df["series"] == "slo_breach_pct"]
-    .groupby(order_cols)["value"]
-    .mean()
-    .reset_index()
-)
-slo_breaches = align_to_pods(slo_breaches)
-
-success_under_slo = (
-    full_df[full_df["series"] == "success_within_slo_pct"]
-    .groupby(order_cols)["value"]
-    .mean()
-    .reset_index()
-)
-success_under_slo = align_to_pods(success_under_slo)
-
 res_sizes = (
     full_df[full_df["series"] == "avg_response_size"]
     .groupby(order_cols)["value"]
@@ -80,15 +64,48 @@ res_sizes = (
 )
 res_sizes = align_to_pods(res_sizes)
 
+res_duration = (
+    full_df[full_df["series"] == "req_duration_avg_ms"]
+    .groupby(order_cols)["value"]
+    .mean()
+    .reset_index()
+)
+
+grp_success = full_df[full_df["series"] == "response_time"].groupby(order_cols)
+res_success = (
+    grp_success["status_code"]
+    .apply(lambda s: (s.astype(float).astype(int) == 200).mean() * 100)
+    .reset_index(name="value")
+)
+res_success = align_to_pods(res_success)
+
+slo_breach = (
+    full_df[full_df["series"] == "slo_breach_pct"]
+    .groupby(order_cols)["value"]
+    .last()
+    .reset_index()
+)
+slo_breach = align_to_pods(slo_breach)
+
+slo_breach_200 = (
+    full_df[full_df["series"] == "slo_breach_success_pct"]
+    .groupby(order_cols)["value"]
+    .last()
+    .reset_index()
+)
+slo_breach_200 = align_to_pods(slo_breach_200)
+
 plt.style.use("bmh")
 cmap = mpl.colormaps[mpl.rcParams["image.cmap"]]
 fig = plt.figure(figsize=(12, 6), layout="constrained")
-gs = fig.add_gridspec(nrows=3, ncols=2, height_ratios=[2, 2, 1])
+gs = fig.add_gridspec(nrows=4, ncols=2, height_ratios=[2, 2, 2, 1])
 ax1 = fig.add_subplot(gs[0, 0])
 ax2 = fig.add_subplot(gs[0, 1])
 ax3 = fig.add_subplot(gs[1, 0])
 ax4 = fig.add_subplot(gs[1, 1])
-ax_legend = fig.add_subplot(gs[2, :])
+ax5 = fig.add_subplot(gs[2, 0])
+ax6 = fig.add_subplot(gs[2, 1])
+ax_legend = fig.add_subplot(gs[3, :])
 
 n = len(pod_means)
 indices = list(range(n))
@@ -99,20 +116,30 @@ ax1.bar_label(rects1, padding=3, fmt="%.2f")
 ax1.set_ylim(0, 5)
 ax1.set_title("Média de Pods")
 
-rects2 = ax2.bar(indices, slo_breaches["value"], color=colors)
-ax2.bar_label(rects2, padding=3, fmt="%.2f")
-ax2.set_ylim(0, 100)
-ax2.set_title("Requisições acima do SLO (Prometheus, %)")
+rects2 = ax2.bar(indices, res_sizes["value"], color=colors)
+ax2.bar_label(rects2, padding=3, fmt=format_size)
+ax2.set_ylim(0, 1500_000)
+ax2.set_title("Tamanho médio das respostas (Prometheus)")
 
-rects3 = ax3.bar(indices, success_under_slo["value"], color=colors)
-ax3.bar_label(rects3, padding=3, fmt="%.2f")
-ax3.set_ylim(0, 100)
-ax3.set_title("Sucesso dentro do SLO (Prometheus, %)")
+rects3 = ax3.bar(indices, res_duration["value"], color=colors)
+ax3.bar_label(rects3, padding=3)
+ax3.set_ylim(0, 8000)
+ax3.set_title("Tempo médio das respostas (ms)")
 
-rects4 = ax4.bar(indices, res_sizes["value"], color=colors)
-ax4.bar_label(rects4, padding=3, fmt=format_size)
-ax4.set_ylim(0, 1500_000)
-ax4.set_title("Tamanho médio das respostas (Prometheus)")
+rects4 = ax4.bar(indices, res_success["value"], color=colors)
+ax4.bar_label(rects4, padding=3, fmt="%.2f")
+ax4.set_ylim(0, 120)
+ax4.set_title("Respostas 200 (%)")
+
+rects5 = ax5.bar(indices, slo_breach["value"], color=colors)
+ax5.bar_label(rects5, padding=3, fmt="%.2f")
+ax5.set_ylim(0, 100)
+ax5.set_title("Requisições acima do SLO")
+
+rects6 = ax6.bar(indices, slo_breach_200["value"], color=colors)
+ax6.bar_label(rects6, padding=3, fmt="%.2f")
+ax6.set_ylim(0, 100)
+ax6.set_title("Requisições acima do SLO, apenas sucesso")
 
 legend_handles = [
     mpatches.Patch(

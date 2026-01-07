@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# Runs the baseline tests, consisting in the following:
+# Runs all the tests, consisting in the following:
 # - kube-znn:800k
 #   - 1 replica
 #   - 3 replicas
@@ -13,6 +13,16 @@
 #   - 1 replica
 #   - 3 replicas
 #   - 5 replicas
+# - hpa
+#   - kube-znn:800k + hpa standard
+#   - kube-znn:800k + hpa behavior scaledown stabilizationWindowSeconds=10
+# - csa horizontal
+#   - kube-znn:800k
+# - csa horizontal + tag quality
+#   - kube-znn:800k rollingUpdate maxSurge=25% & maxUnavailable=25%
+#   - kube-znn:800k rollingUpdate maxSurge=50% & maxUnavailable=50%
+#   - kube-znn:800k rollingUpdate maxSurge=75% & maxUnavailable=75%
+#   - kube-znn:800k rollingUpdate maxSurge=100% & maxUnavailable=100%
 # sleeps for a minute between locust executions
 
 kubectl delete hpa znn
@@ -74,7 +84,7 @@ sleep 60
 
 
 echo "####################################"
-echo "#          Iniciando HPA          #"
+echo "#           Starting HPA           #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
@@ -87,7 +97,7 @@ kubectl delete -f autoscalers/hpa/znn.yaml
 
 
 echo "####################################"
-echo "#        Iniciando HPA Fast        #"
+echo "#        Starting HPA Fast         #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
@@ -100,7 +110,7 @@ kubectl delete -f autoscalers/hpa/znn_fast.yaml
 
 
 echo "####################################"
-echo "#          Iniciando CSA H         #"
+echo "#          Starting CSA H          #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
@@ -113,7 +123,7 @@ sleep 60
 
 
 echo "####################################"
-echo "#       Iniciando CSA HQ 25%       #"
+echo "#       Starting CSA HQ 25%        #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
@@ -127,7 +137,7 @@ sleep 60
 
 
 echo "####################################"
-echo "#       Iniciando CSA HQ 50%       #"
+echo "#       Starting CSA HQ 50%        #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
@@ -139,7 +149,7 @@ sleep 60
 
 
 echo "####################################"
-echo "#       Iniciando CSA HQ 75%       #"
+echo "#       Starting CSA HQ 75%        #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
@@ -151,7 +161,7 @@ sleep 60
 
 
 echo "####################################"
-echo "#      Iniciando CSA HQ 100%       #"
+echo "#      Starting CSA HQ 100%        #"
 echo "####################################"
 
 kubectl apply -k kube-znn/manifests/overlay/800k/

@@ -67,11 +67,14 @@ def build_queries(ns: str):
     )
     """
 
-    success_within_slo_pct = f"""
+    slo_breach_success_pct = f"""
     100 *
-    sum(rate(request_duration_seconds_bucket{{host="znn", status="200", le="{SLO_SECONDS:.1f}"}}[5m]))
-    /
-    sum(rate(requests_total{{host="znn", status="200"}}[5m]))
+    (
+        1 -
+        sum(rate(request_duration_seconds_bucket{{host="znn", status="200", le="{SLO_SECONDS:.1f}"}}[5m]))
+        /
+        sum(rate(request_duration_seconds_count{{host="znn", status="200"}}[5m]))
+    )
     """
 
     return {
@@ -81,7 +84,7 @@ def build_queries(ns: str):
         "znn_pods_per_tag": znn_pods_per_tag,
         "avg_response_size": avg_response_size,
         "slo_breach_pct": slo_breach_pct,
-        "success_within_slo_pct": success_within_slo_pct,
+        "slo_breach_success_pct": slo_breach_success_pct,
     }
 
 

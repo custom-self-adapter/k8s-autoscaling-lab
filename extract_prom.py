@@ -12,16 +12,16 @@ SLO_SECONDS = 1.0
 
 
 def build_queries(ns: str):
-    req_duration_avg_ms = """
+    znn_req_duration_avg_ms = """
     1000 *
     sum(rate(request_duration_seconds_sum{host="znn"}[30s]))
     /
     sum(rate(request_duration_seconds_count{host="znn"}[30s]))
     """.strip()
 
-    requests_per_second = """sum(rate(requests_total{host="znn"}[5m]))"""
+    znn_requests_per_second = """sum(rate(requests_total{host="znn"}[5m]))"""
 
-    error_rate = """sum(rate(requests_total{host="znn", status="200"}[5m]))/sum(rate(requests_total{host="znn"}[5m]))"""
+    znn_error_rate = """sum(rate(requests_total{host="znn", status="200"}[5m]))/sum(rate(requests_total{host="znn"}[5m]))"""
 
     znn_pods_per_tag = f"""
     sum by (tag) (
@@ -41,7 +41,7 @@ def build_queries(ns: str):
     )
     """.strip()
 
-    avg_response_size = f"""
+    ing_avg_response_size = f"""
     avg(
         rate(
             nginx_ingress_controller_response_size_sum{{exported_namespace="{ns}", ingress="kube-znn", status="200"}}
@@ -57,7 +57,7 @@ def build_queries(ns: str):
     )
     """
 
-    slo_breach_pct = f"""
+    znn_slo_breach_pct = f"""
     100 *
     (
         1 -
@@ -67,7 +67,7 @@ def build_queries(ns: str):
     )
     """
 
-    slo_breach_success_pct = f"""
+    znn_slo_breach_success_pct = f"""
     100 *
     (
         1 -
@@ -77,14 +77,19 @@ def build_queries(ns: str):
     )
     """
 
+    kube_pod_cpu_limits = """
+    max(kube_pod_container_resource_limits{resource="cpu", namespace="default", container="znn"})
+    """
+
     return {
-        "req_duration_avg_ms": req_duration_avg_ms,
-        "requests_per_second": requests_per_second,
-        "error_rate": error_rate,
+        "znn_req_duration_avg_ms": znn_req_duration_avg_ms,
+        "znn_requests_per_second": znn_requests_per_second,
+        "znn_error_rate": znn_error_rate,
         "znn_pods_per_tag": znn_pods_per_tag,
-        "avg_response_size": avg_response_size,
-        "slo_breach_pct": slo_breach_pct,
-        "slo_breach_success_pct": slo_breach_success_pct,
+        "ing_avg_response_size": ing_avg_response_size,
+        "znn_slo_breach_pct": znn_slo_breach_pct,
+        "znn_slo_breach_success_pct": znn_slo_breach_success_pct,
+        "kube_pod_cpu_limits": kube_pod_cpu_limits,
     }
 
 
@@ -122,7 +127,7 @@ def results_to_df(result_json, series_name):
     return pd.DataFrame(rows).sort_values("ts")
 
 
-def extract(user_count=None, response_time=None):
+def extract(loc_user_count=None, loc_response_time=None):
     logging.basicConfig(format="[%(asctime)s] %(name)s %(message)s", level=logging.INFO)
     ns = "default"
     window_minutes = 5
@@ -139,10 +144,10 @@ def extract(user_count=None, response_time=None):
         df = results_to_df(j, name)
         all_dfs.append(df)
 
-    if user_count is not None:
-        all_dfs.append(pd.DataFrame(user_count))
-    if response_time is not None:
-        all_dfs.append(pd.DataFrame(response_time).sort_values("ts"))
+    if loc_user_count is not None:
+        all_dfs.append(pd.DataFrame(loc_user_count))
+    if loc_response_time is not None:
+        all_dfs.append(pd.DataFrame(loc_response_time).sort_values("ts"))
 
     data = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
     csv_file = f"./tests/results/prom_extract_{now.strftime('%Y%m%d%H%M')}.csv"

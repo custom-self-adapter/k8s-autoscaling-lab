@@ -39,10 +39,10 @@ class Stats:
     def as_response_time_row(self) -> dict:
         return {
             "ts": self.ts,
-            "series": "response_time",
+            "series": "loc_response_time",
             "value": self.response_time,
-            "response_size": self.response_length,
-            "status_code": self.status_code,
+            "loc_response_size": self.response_length,
+            "loc_status_code": self.status_code,
         }
 
     def key(self) -> tuple:
@@ -119,10 +119,10 @@ class DoubleWave(LoadTestShape):
 
     stages: list[dict[str, int]] = [
         {"end": 30, "users": 20, "spawn_rate": 20},
-        {"end": 120, "users": 300, "spawn_rate": 8},
-        {"end": 210, "users": 150, "spawn_rate": 8},
-        {"end": 270, "users": 300, "spawn_rate": 25},
-        {"end": 300, "users": 20, "spawn_rate": 25},
+        {"end": 120, "users": 100, "spawn_rate": 3},
+        {"end": 210, "users": 60, "spawn_rate": 3},
+        {"end": 270, "users": 120, "spawn_rate": 15},
+        {"end": 300, "users": 20, "spawn_rate": 15},
     ]
 
     @override
@@ -137,7 +137,7 @@ class DoubleWave(LoadTestShape):
             {
                 "ts": get_timestamp(),
                 "value": self.get_current_user_count(),
-                "series": "user_count",
+                "series": "loc_user_count",
             }
         )
 
@@ -145,10 +145,12 @@ class DoubleWave(LoadTestShape):
         for stage in self.stages:
             if run_time < stage["end"]:
                 tick_data = (stage["users"], stage["spawn_rate"])
+                self.logger.info(f'{int(run_time)}, {stage["users"]}, {stage["spawn_rate"]}, {self.get_current_user_count()}"')
                 return tick_data
 
         extract(
-            user_count=self.user_count, response_time=stats.get_response_time_rows()
+            loc_user_count=self.user_count,
+            loc_response_time=stats.get_response_time_rows(),
         )
         return None
 

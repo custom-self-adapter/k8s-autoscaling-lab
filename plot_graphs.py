@@ -22,7 +22,7 @@ plt.rcParams.update(
     }
 )
 
-ZNN_DUR_SERIES = "znn_req_duration_avg_ms"
+ZNN_DUR_SERIES = "znn_latency_ms_p95"
 ZNN_DUR_LABEL = "Duração das Requisições (ZNN)"
 ZNN_PODS_SERIES = "znn_pods_per_tag"
 ZNN_PODS_LABELS = "Pods por Tag (ZNN)"
@@ -33,6 +33,8 @@ LOC_RESP_SIZE_LABEL = "Tamanho das Respostas (LOC)"
 LOC_STATUS_CODE_SERIES = "loc_status_code"
 LOC_USERS_SERIES = "loc_user_count"
 LOC_USERS_LABEL = "Usuários Simultâneos"
+KUBE_POD_CPU_SERIES = "kube_pod_cpu_limits"
+KUBE_POD_CPU_LABEL = "Limite de CPU dos Contêineres"
 
 
 RTM_SERIES = "response_time"
@@ -45,7 +47,7 @@ RESP_CODE_LABEL = "Código de Resposta"
 SLO_BREACH_SERIES = "slo_breach_pct"
 SLO_BREACH_200_SERIES = "slo_breach_success_pct"
 
-SLO_MILISECONDS = 1500
+SLO_MILISECONDS = 1000
 
 # ==============================
 #  CORES (exclusivas por métrica + degradê para pods)
@@ -97,6 +99,11 @@ def mmss_fmt(x, pos):
     return f"{m:02d}:{s:02d}"
 
 
+def is_uniform(s):
+    a = s.to_numpy()
+    return (a[0] == a).all()
+
+
 def build_status_pivot(df_response_code):
     if df_response_code.empty or "status_code" not in df_response_code.columns:
         return None, 0.0
@@ -143,6 +150,7 @@ def main(file_input: str, file_output: Path | None):
         extra_cols=[LOC_RESP_SIZE_SERIES, LOC_STATUS_CODE_SERIES],
     )
     df_users = select_series(data, LOC_USERS_SERIES)
+    df_cpu = select_series(data, KUBE_POD_CPU_SERIES)
     df_pods = data[data["series"] == ZNN_PODS_SERIES].copy()
     pivot_pods = (
         df_pods.groupby(["ts", "tag"])["value"].sum().unstack("tag").sort_index()
@@ -212,6 +220,27 @@ def main(file_input: str, file_output: Path | None):
     )
     legend_lines.append(ln_slo)
     legend_labels.append(f"SLO ({SLO_MILISECONDS}ms)")
+    
+    # if not is_uniform(df_cpu["value"]):
+    if True:
+        # Only show CPU limits variation if there's variation to show
+        ax_cpu = ax_top.twinx()
+        # Move the third y-axis to the right so it does not overlap response size axis
+        ax_cpu.spines["right"].set_position(("outward", 80))
+        ax_cpu.patch.set_visible(False)
+        ax_cpu.grid(False)
+        (ln_cpu,) = ax_cpu.plot(
+            to_rel_seconds(df_cpu["ts"], ts_zero),
+            df_cpu["value"],
+            label=KUBE_POD_CPU_LABEL,
+            linewidth=1.0,
+            color=COLORS_METRICS["SLO"],
+        )
+        legend_lines.append(ln_cpu)
+        legend_labels.append(KUBE_POD_CPU_LABEL)
+        ax_cpu.set_ylabel(KUBE_POD_CPU_LABEL)
+        ax_cpu.set_ylim(0, 1.1)
+
 
     ax_pods = ax_top.twinx()
     ax_pods.patch.set_visible(False)
@@ -233,6 +262,8 @@ def main(file_input: str, file_output: Path | None):
             legend_labels.append(f"Pods tag {tag}")
     ax_pods.set_ylabel(ZNN_PODS_LABELS)
     ax_pods.set_ylim(0.5, 5.5)
+    
+    ax_top.set_xlim(0, 300)
 
     # ------------------------------
     #  Mid: Users + Response size
@@ -263,13 +294,16 @@ def main(file_input: str, file_output: Path | None):
         )
         legend_lines.append(ln_rsz)
         legend_labels.append("Response size")
+
     ax_rsz.set_ylabel("Response size")
     ax_rsz.yaxis.set_major_formatter(mtick.FuncFormatter(lambda v, p: format_size(v)))
     ax_rsz.set_ylim(0, 1_100_000)
-
+    
     # Eixo do tempo no subplot inferior
     ax_mid.set_xlabel("Tempo (mm:ss)")
     ax_mid.xaxis.set_major_formatter(mtick.FuncFormatter(mmss_fmt))
+    ax_mid.set_xlim(0, 300)
+
 
     # ------------------------------
     #  LEGENDA
@@ -289,7 +323,7 @@ def main(file_input: str, file_output: Path | None):
     #  TABELA FINAL
     # ------------------------------
     ax_tbl.axis("off")
-    
+
     count_reqs = df_resp_time_loc["value"].count()
 
     pct_success = (

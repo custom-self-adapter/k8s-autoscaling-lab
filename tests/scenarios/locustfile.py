@@ -119,10 +119,10 @@ class DoubleWave(LoadTestShape):
 
     stages: list[dict[str, int]] = [
         {"end": 30, "users": 20, "spawn_rate": 20},
-        {"end": 120, "users": 100, "spawn_rate": 3},
-        {"end": 210, "users": 60, "spawn_rate": 3},
-        {"end": 270, "users": 120, "spawn_rate": 15},
-        {"end": 300, "users": 20, "spawn_rate": 15},
+        {"end": 120, "users": 100, "spawn_rate": 2},
+        {"end": 200, "users": 60, "spawn_rate": 2},
+        {"end": 250, "users": 120, "spawn_rate": 10},
+        {"end": 300, "users": 20, "spawn_rate": 10},
     ]
 
     @override

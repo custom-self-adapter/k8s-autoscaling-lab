@@ -12,11 +12,21 @@ SLO_SECONDS = 1.0
 
 
 def build_queries(ns: str):
-    znn_req_duration_avg_ms = """
+    znn_latency_ms_avg = """
     1000 *
     sum(rate(request_duration_seconds_sum{host="znn"}[30s]))
     /
     sum(rate(request_duration_seconds_count{host="znn"}[30s]))
+    """.strip()
+    
+    znn_latency_ms_p95 = """
+    1000 *
+    histogram_quantile(
+      0.95,
+      sum by (le, namespace, pod) (
+        rate(request_duration_seconds_bucket{host="znn"}[30s])
+      )
+    )
     """.strip()
 
     znn_requests_per_second = """sum(rate(requests_total{host="znn"}[5m]))"""
@@ -40,22 +50,6 @@ def build_queries(ns: str):
         (kube_pod_status_phase{{namespace="{ns}"}} == 1)
     )
     """.strip()
-
-    ing_avg_response_size = f"""
-    avg(
-        rate(
-            nginx_ingress_controller_response_size_sum{{exported_namespace="{ns}", ingress="kube-znn", status="200"}}
-            [1m]
-        )
-    )
-    /
-    avg(
-        rate(
-            nginx_ingress_controller_response_size_count{{exported_namespace="{ns}", ingress="kube-znn", status="200"}}
-            [1m]
-        )
-    )
-    """
 
     znn_slo_breach_pct = f"""
     100 *
@@ -82,11 +76,11 @@ def build_queries(ns: str):
     """
 
     return {
-        "znn_req_duration_avg_ms": znn_req_duration_avg_ms,
+        "znn_latency_ms_avg": znn_latency_ms_avg,
+        "znn_latency_ms_p95": znn_latency_ms_p95,
         "znn_requests_per_second": znn_requests_per_second,
         "znn_error_rate": znn_error_rate,
         "znn_pods_per_tag": znn_pods_per_tag,
-        "ing_avg_response_size": ing_avg_response_size,
         "znn_slo_breach_pct": znn_slo_breach_pct,
         "znn_slo_breach_success_pct": znn_slo_breach_success_pct,
         "kube_pod_cpu_limits": kube_pod_cpu_limits,

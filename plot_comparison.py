@@ -1,99 +1,85 @@
-import json
-import os
 import sys
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import pandas as pd
 from mpl_toolkits.mplot3d.axis3d import mpatches
 
+from plot_helper import (
+    apply_standard_renames,
+    filter_http_success,
+    load_config_file,
+    read_results,
+    select_series,
+)
 from utils import format_size
+
+PODS_SERIES = "znn_pods_per_tag"
+RESP_SIZE_SERIES = "ing_avg_response_size"
+RESP_TIME_SERIES = "loc_response_time"
+STATUS_CODE_COL = "loc_status_code"
+LOC_RESP_SIZE_COL = "loc_response_size"
+SLO_BREACH_SERIES = "znn_slo_breach_pct"
+SLO_BREACH_SUCCESS_SERIES = "znn_slo_breach_success_pct"
+REQ_DURATION_SERIES = "znn_req_duration_avg_ms"
+
+SLO_MILISECONDS = 1000
 
 if len(sys.argv) < 2:
     sys.stderr.write("Must inform config file")
     sys.exit(1)
 
 arg_config_filename = sys.argv[1]
-if not os.path.isfile(arg_config_filename):
-    sys.stderr.write(f"{arg_config_filename} must exist")
-    sys.exit(1)
-
-try:
-    data_source = json.load(open(arg_config_filename))
-except json.JSONDecodeError:
-    sys.stderr.write(f"{arg_config_filename} must be a valid JSON file")
-    sys.exit(1)
+data_source = load_config_file(arg_config_filename)
 
 files_root = "tests/results/"
 
-all_dfs = []
-for src in data_source:
-    df = pd.read_csv(f"{files_root}{src['file']}")
-    df["scaling"] = src["scaling"]
-    df["order"] = src["order"]
-    all_dfs.append(df)
-
-full_df = pd.concat(all_dfs)
+full_df = read_results(data_source, files_root, ["scaling", "order"])
+full_df = apply_standard_renames(full_df)
 
 order_cols = ["order", "scaling"]
 
-grouped = full_df[full_df["series"] == "znn_pods_per_tag"].groupby(order_cols)
+grouped = full_df[full_df["series"] == PODS_SERIES].groupby(order_cols)
 pod_means = grouped["value"].mean().reset_index()
 
-
-def align_to_pods(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        base = pod_means.copy()
-        if "value" not in base.columns:
-            base["value"] = 0
-        base["value"] = 0
-        return base[order_cols + ["value"]]
-    return (
-        df.set_index(order_cols)
-        .reindex(pod_means.set_index(order_cols).index)
-        .fillna(0)
-        .reset_index()
-    )
-
-
 res_sizes = (
-    full_df[full_df["series"] == "avg_response_size"]
-    .groupby(order_cols)["value"]
+    full_df[full_df["series"] == RESP_TIME_SERIES]
+    .groupby(order_cols)[LOC_RESP_SIZE_COL]
     .mean()
     .reset_index()
+    .rename(columns={LOC_RESP_SIZE_COL: "value"})
 )
-res_sizes = align_to_pods(res_sizes)
 
-res_duration = (
-    full_df[full_df["series"] == "req_duration_avg_ms"]
-    .groupby(order_cols)["value"]
+resp_time = select_series(full_df, RESP_TIME_SERIES, order_cols + [STATUS_CODE_COL])
+resp_time_mean = resp_time.groupby(order_cols)["value"].mean().reset_index()
+
+pct_success = (
+    resp_time.assign(success=resp_time[STATUS_CODE_COL] == 200)
+    .groupby(order_cols)["success"]
     .mean()
+    .mul(100)
     .reset_index()
+    .rename(columns={"success": "value"})
 )
 
-grp_success = full_df[full_df["series"] == "response_time"].groupby(order_cols)
-res_success = (
-    grp_success["status_code"]
-    .apply(lambda s: (s.astype(float).astype(int) == 200).mean() * 100)
-    .reset_index(name="value")
-)
-res_success = align_to_pods(res_success)
+resp_time_success = filter_http_success(resp_time, STATUS_CODE_COL)
 
 slo_breach = (
-    full_df[full_df["series"] == "slo_breach_pct"]
-    .groupby(order_cols)["value"]
-    .last()
+    resp_time.assign(breach=resp_time["value"] > SLO_MILISECONDS)
+    .groupby(order_cols)["breach"]
+    .mean()
+    .mul(100)
     .reset_index()
+    .rename(columns={"breach": "value"})
 )
-slo_breach = align_to_pods(slo_breach)
 
 slo_breach_200 = (
-    full_df[full_df["series"] == "slo_breach_success_pct"]
-    .groupby(order_cols)["value"]
-    .last()
+    resp_time_success.assign(breach=resp_time_success["value"] > SLO_MILISECONDS)
+    .groupby(order_cols)["breach"]
+    .mean()
+    .mul(100)
     .reset_index()
+    .rename(columns={"breach": "value"})
 )
-slo_breach_200 = align_to_pods(slo_breach_200)
 
 plt.style.use("bmh")
 cmap = mpl.colormaps[mpl.rcParams["image.cmap"]]
@@ -113,33 +99,33 @@ colors = [cmap(i / max(1, n - 1)) for i in indices]
 
 rects1 = ax1.bar(indices, pod_means["value"], color=colors)
 ax1.bar_label(rects1, padding=3, fmt="%.2f")
-ax1.set_ylim(0, 5)
-ax1.set_title("Média de Pods")
+ax1.set_ylim(0, 6)
+ax1.set_title("Média de Pods (ZNN)")
 
 rects2 = ax2.bar(indices, res_sizes["value"], color=colors)
 ax2.bar_label(rects2, padding=3, fmt=format_size)
 ax2.set_ylim(0, 1500_000)
-ax2.set_title("Tamanho médio das respostas (Prometheus)")
+ax2.set_title("Tamanho médio das respostas (LOC)")
 
-rects3 = ax3.bar(indices, res_duration["value"], color=colors)
+rects3 = ax3.bar(indices, resp_time_mean["value"], color=colors)
 ax3.bar_label(rects3, padding=3)
-ax3.set_ylim(0, 8000)
-ax3.set_title("Tempo médio das respostas (ms)")
+ax3.set_ylim(0, 12000)
+ax3.set_title("Tempo médio das respostas (ms) (LOC)")
 
-rects4 = ax4.bar(indices, res_success["value"], color=colors)
+rects4 = ax4.bar(indices, pct_success["value"], color=colors)
 ax4.bar_label(rects4, padding=3, fmt="%.2f")
 ax4.set_ylim(0, 120)
-ax4.set_title("Respostas 200 (%)")
+ax4.set_title("Respostas 200 (%) (LOC)")
 
 rects5 = ax5.bar(indices, slo_breach["value"], color=colors)
 ax5.bar_label(rects5, padding=3, fmt="%.2f")
-ax5.set_ylim(0, 100)
-ax5.set_title("Requisições acima do SLO")
+ax5.set_ylim(0, 120)
+ax5.set_title("Requisições acima do SLO (LOC)")
 
 rects6 = ax6.bar(indices, slo_breach_200["value"], color=colors)
 ax6.bar_label(rects6, padding=3, fmt="%.2f")
-ax6.set_ylim(0, 100)
-ax6.set_title("Requisições acima do SLO, apenas sucesso")
+ax6.set_ylim(0, 120)
+ax6.set_title("Requisições acima do SLO, apenas sucesso (LOC)")
 
 legend_handles = [
     mpatches.Patch(

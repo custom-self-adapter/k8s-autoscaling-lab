@@ -1,10 +1,10 @@
 prometheusOperator:
   nodeSelector:
-    monitoring: "yes"
+    autoscaling.lab/monitoring: "yes"
 alertmanager:
   alertmanagerSpec:
     nodeSelector:
-      monitoring: "yes"
+      autoscaling.lab/monitoring: "yes"
 prometheus:
   ingress:
     enabled: true
@@ -15,7 +15,7 @@ prometheus:
     enableRemoteWriteReceiver: true
     scrapeInterval: 5s
     nodeSelector:
-      monitoring: "yes"
+      autoscaling.lab/monitoring: "yes"
   service:
     type: LoadBalancer
     loadBalancerIP: 10.0.0.17

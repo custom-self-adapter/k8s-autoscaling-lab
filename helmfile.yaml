@@ -1,6 +1,8 @@
 repositories:
   - name: jetstack
     url: https://charts.jetstack.io
+  - name: rancher
+    url: git+https://github.com/rancher/local-path-provisioner@/deploy/chart/local-path-provisioner?ref=master
   - name: ingress-nginx
     url: https://kubernetes.github.io/ingress-nginx
   - name: prometheus-community
@@ -22,13 +24,13 @@ releases:
           enabled: true
           keep: false
         nodeSelector:
-          cert: "yes"
+          autoscaling.lab/cert: "yes"
         webhook:
           nodeSelector:
-            cert: "yes"
+            autoscaling.lab/cert: "yes"
         cainjector:
           nodeSelector:
-            cert: "yes"
+            autoscaling.lab/cert: "yes"
 
   - name: metallb
     chart: metallb/metallb
@@ -42,8 +44,8 @@ releases:
 
   - name: local-path
     namespace: local-path-storage
-    chart: charts/local-path-provisioner
-    version: 0.0.31
+    chart: rancher/local-path-provisioner
+    version: 0.0.34
     values:
       - storageClass:
           defaultClass: true
@@ -73,17 +75,11 @@ releases:
     values:
       - values/prometheus-adapter.yaml
 
-  # - name: cpa-operator
-  #   namespace: cpa-operator
-  #   chart: charts/custom-pod-autoscaler-operator
-  #   version: v1.4.2
-  #   values: []
-
-  # - name: online-boutique
-  #   namespace: boutique
-  #   chart: charts/onlineboutique
-  #   version: 0.10.2
-  #   values: []
+  - name: csa-operator
+    namespace: csa
+    chart: charts/custom-self-adapter-operator
+    values:
+      - values/csa-operator.yaml
 
   - name: registry
     namespace: registry

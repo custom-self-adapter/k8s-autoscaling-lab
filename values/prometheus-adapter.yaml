@@ -1,5 +1,5 @@
 nodeSelector:
-  monitoring: "yes"
+  autoscaling.lab/monitoring: "yes"
 
 prometheus:
   url: http://kube-prometheus-stack-prometheus.monitoring
@@ -7,23 +7,6 @@ prometheus:
 rules:
   default: false
   external:
-    - seriesQuery: 'nginx_ingress_controller_request_duration_seconds_count{ingress!=""}'
-      resources:
-        overrides:
-          exported_namespace:
-            resource: "namespace"
-          ingress:
-            resource: "ingress"
-      name:
-        as: "nginx_ingress_avg_ms"
-      metricsQuery: |
-        sum by (ingress, exported_namespace) (
-          rate(nginx_ingress_controller_request_duration_seconds_sum{<<.LabelMatchers>>}[1m])
-        )
-        /
-        sum by (ingress, exported_namespace) (
-          rate(nginx_ingress_controller_request_duration_seconds_count{<<.LabelMatchers>>}[1m])
-        ) * 1000
     - seriesQuery: 'request_duration_seconds_sum{namespace!="",pod!=""}'
       resources:
         overrides:
@@ -32,10 +15,42 @@ rules:
           pod:
             resource: "pod"
       name:
-        as: "znn_latency_ms_average"
+        as: "znn_latency_ms_avg"
       metricsQuery: >
         1000 *
         sum(rate(request_duration_seconds_sum{host="znn"}[30s]))
         /
         sum(rate(request_duration_seconds_count{host="znn"}[30s]))
-
+    - seriesQuery: 'request_duration_seconds_bucket{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: "namespace"
+          pod:
+            resource: "pod"
+      name:
+        as: "znn_latency_ms_p95"
+      metricsQuery: >
+        1000 *
+        histogram_quantile(
+          0.95,
+          sum by (le, namespace, pod) (
+            rate(request_duration_seconds_bucket{host="znn"}[30s])
+          )
+        )
+    - seriesQuery: 'request_duration_seconds_bucket{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: "namespace"
+          pod:
+            resource: "pod"
+      name:
+        as: "znn_requests_over_1s_ratio"
+      metricsQuery: >
+        1 -
+        (
+          sum(rate(request_duration_seconds_bucket{host="znn",le="1.0"}[30s]))
+          /
+          sum(rate(request_duration_seconds_count{host="znn"}[30s]))
+        )

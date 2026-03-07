@@ -22,4 +22,4 @@ resources:
     memory: 256Mi
 
 nodeSelector:
-  ingress: "yes"
+  autoscaling.lab/registry: "yes"

@@ -1,3 +1,4 @@
+import math
 import sys
 
 import matplotlib as mpl
@@ -99,17 +100,17 @@ colors = [cmap(i / max(1, n - 1)) for i in indices]
 
 rects1 = ax1.bar(indices, pod_means["value"], color=colors)
 ax1.bar_label(rects1, padding=3, fmt="%.2f")
-ax1.set_ylim(0, 6)
+ax1.set_ylim(0, math.ceil(pod_means["value"].max() * 1.2))
 ax1.set_title("Média de Pods (ZNN)")
 
 rects2 = ax2.bar(indices, res_sizes["value"], color=colors)
 ax2.bar_label(rects2, padding=3, fmt=format_size)
-ax2.set_ylim(0, 1500_000)
+ax2.set_ylim(0, math.ceil(res_sizes["value"].max() * 1.2))
 ax2.set_title("Tamanho médio das respostas (LOC)")
 
 rects3 = ax3.bar(indices, resp_time_mean["value"], color=colors)
-ax3.bar_label(rects3, padding=3)
-ax3.set_ylim(0, 12000)
+ax3.bar_label(rects3, padding=3, fmt="%.2f")
+ax3.set_ylim(0, math.ceil(resp_time_mean["value"].max() * 1.2))
 ax3.set_title("Tempo médio das respostas (ms) (LOC)")
 
 rects4 = ax4.bar(indices, pct_success["value"], color=colors)
@@ -120,12 +121,12 @@ ax4.set_title("Respostas 200 (%) (LOC)")
 rects5 = ax5.bar(indices, slo_breach["value"], color=colors)
 ax5.bar_label(rects5, padding=3, fmt="%.2f")
 ax5.set_ylim(0, 120)
-ax5.set_title("Requisições acima do SLO (LOC)")
+ax5.set_title("Requisições acima do SLO (%) (LOC)")
 
 rects6 = ax6.bar(indices, slo_breach_200["value"], color=colors)
 ax6.bar_label(rects6, padding=3, fmt="%.2f")
 ax6.set_ylim(0, 120)
-ax6.set_title("Requisições acima do SLO, apenas sucesso (LOC)")
+ax6.set_title("Requisições acima do SLO, apenas sucesso (%) (LOC)")
 
 legend_handles = [
     mpatches.Patch(

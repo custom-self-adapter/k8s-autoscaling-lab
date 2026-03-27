@@ -1,0 +1,42 @@
+[
+    {
+        "order": 1,
+        "scaling": "Baseline",
+        "file": "prom_extract_202603102113.csv"
+    },
+    {
+        "order": 2,
+        "scaling": "HPA Padrão",
+        "file": "prom_extract_202603102125.csv"
+    },
+    {
+        "order": 3,
+        "scaling": "HPA scaleDown rápido",
+        "file": "prom_extract_202603102132.csv"
+    },
+    {
+        "order": 4,
+        "scaling": "CSA Horizontal",
+        "file": "prom_extract_202603102138.csv"
+    },
+    {
+        "order": 5,
+        "scaling": "CSA Horizontal e Qualidade rollout 25%",
+        "file": "prom_extract_202603102145.csv"
+    },
+    {
+        "order": 6,
+        "scaling": "CSA Horizontal e Qualidade rollout 50%",
+        "file": "prom_extract_202603102151.csv"
+    },
+    {
+        "order": 7,
+        "scaling": "VPA",
+        "file": "prom_extract_202603102158.csv"
+    },
+    {
+        "order": 8,
+        "scaling": "CSA Vertical e Qualidade",
+        "file": "prom_extract_202603102204.csv"
+    }
+]

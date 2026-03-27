@@ -16,28 +16,39 @@ evaluate:
 adapt:
   adapt_replicas:
     type: "shell"
-    timeout: 1000
+    timeout: 2000
     shell:
       entrypoint: "python"
       command:
         - "/scripts/adapt_replicas.py"
   adapt_tag:
     type: "shell"
-    timeout: 1000
+    timeout: 2000
     shell:
       entrypoint: "python"
       command:
         - "/scripts/adapt_tag.py"
+  adapt_cpu:
+    type: "shell"
+    timeout: 2000
+    shell:
+      entrypoint: "python"
+      command:
+        - "/scripts/adapt_cpu.py"
+interval: 5000
+minReplicas: 1
+maxReplicas: 5
+maxCPU: 1000
 kubernetesMetricSpecs:
   - type: External
     external:
       metric:
-        name: znn_latency_ms_average
+        name: znn_latency_ms_p95
       target:
         type: Value
         value: 1000
-interval: 5000
-minReplicas: 1
-maxReplicas: 5
+enabled_strategies:
+  - adapt_cpu
+  - adapt_tag
 requireKubernetesMetrics: true
-logVerbosity: 3
+logVerbosity: 4

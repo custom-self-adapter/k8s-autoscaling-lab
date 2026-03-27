@@ -1,106 +1,101 @@
 import json
 import math
 import sys
-import yaml
 
-from kubernetes.utils.quantity import parse_quantity
-
+from adapt_base import AdaptContext, load_config
+from adapt_cpu import PARAM_CPU_MULTIPLIER
+from adapt_tag import PARAM_TAG_UP, PARAM_UPDATE_CPU
 from adapter_logger import AdapterLogger
-from adapt_tag import PARAM_TAG_UP
-
+from initial_data import get_stored_cpu_limit, store_cpu_limit
+from kubernetes.utils.quantity import parse_quantity
 
 STRATEGY_REPLICAS = "adapt_replicas"
 STRATEGY_TAG = "adapt_tag"
-
-
-logger = AdapterLogger("evaluate").logger
-
-
-def load_config(configfile = '/config.yaml') -> dict | None:
-    with open(configfile) as file:
-        try:
-            config = yaml.safe_load(file)
-            if config is None:
-                sys.stderr.write("config file was empty")
-                return None
-            return config
-        except yaml.YAMLError as e:
-            sys.stderr.write(f"failed to parse config file: {e}")
-            return None
+STRATEGY_CPU = "adapt_cpu"
 
 
 def main(spec_raw: str):
-    logger.info("Starting evaluate script")
+    ctx = AdaptContext(spec_raw, "evaluate")
+    ctx.logger.info("Starting evaluate script")
 
     config = load_config()
     if config is None:
         # Error was already written to stderr
-        logger.error("config is None")
+        ctx.logger.error("config is None")
         return
+    ctx.logger.info("  loaded config")
 
     spec = json.loads(spec_raw)
+    metrics = json.loads(spec["metrics"][0]["value"])
+    ctx.logger.info("  loaded spec data")
 
-    metrics = json.loads(spec['metrics'][0]['value'])
-    logger.info(json.dumps(metrics))
-    resource = spec['resource']
+    enabled_strategies = config.get("enabled_strategies", (STRATEGY_REPLICAS))
+    min_replicas = config.get("minReplicas", 1)
+    max_replicas = config.get("maxReplicas", 10)
+    max_cpu: int = config.get("maxCPU", 1000)
+    ctx.logger.info("  parsed config data")
 
-    min_replicas = config['minReplicas'] if 'minReplicas' in config else 0
-    max_replicas = config['maxReplicas'] if 'maxReplicas' in config else 0
-
-    current_value = int(parse_quantity(metrics['current_value']))
-    target_value = int(parse_quantity(metrics['target_value'])) * 1000
-    logger.info(f"{current_value} / {target_value}")
+    current_value = int(parse_quantity(metrics["current_value"]))
+    target_value = int(parse_quantity(metrics["target_value"])) * 1000
     rate = current_value / target_value
+    ctx.logger.info(f"rate {current_value} / {target_value} = {rate}")
 
-    plan(resource, rate, min_replicas, max_replicas)
+    ctx.logger.info(f"plan for rate {rate}; stragegies {enabled_strategies}")
 
+    current_replicas = ctx.resource["spec"]["replicas"]
+    current_mcpu = ctx.get_current_mcpu()
+    if not current_mcpu:
+        ctx.logger.error("Current CPU limit not found or unparsable")
+        return
+    initial_cpu_data = get_stored_cpu_limit() or 0
+    if not initial_cpu_data:
+        spec_mcpu = ctx.get_spec_mcpu()
+        store_cpu_limit(spec_mcpu)
+    initial_mcpu = int(initial_cpu_data)
 
-def plan(resource, rate, min_replicas, max_replicas):
-    logger.info(f"plan for rate {rate}")
-
-    current_replicas = resource['spec']['replicas']
     # HPA Logic to scale replicas
     desired_replicas = math.ceil(current_replicas * rate)
-    logger.info(f"calculated desired_replicas {desired_replicas}")
 
-    if rate >= 1:
-        if current_replicas != max_replicas:
-            # Respects max_replicas
+    if rate >= 0.95:
+        if STRATEGY_REPLICAS in enabled_strategies and current_replicas < max_replicas:
             desired_replicas = min(desired_replicas, max_replicas)
-            write_evaluation(STRATEGY_REPLICAS, {
-                'replicas': desired_replicas
-            })
-        else:
-            # write_evaluation(STRATEGY_REPLICAS, {
-            #     'replicas': current_replicas
-            # })
-            write_evaluation(STRATEGY_TAG, {
-                PARAM_TAG_UP: False
-            })
-    else:
-        if current_replicas != min_replicas:
-            # Respect min_replicas
+            write_evaluation(ctx, STRATEGY_REPLICAS, {"replicas": desired_replicas})
+            return
+        if STRATEGY_CPU in enabled_strategies and current_mcpu < max_cpu:
+            write_evaluation(ctx, STRATEGY_CPU, {PARAM_CPU_MULTIPLIER: rate})
+            return
+        if STRATEGY_TAG in enabled_strategies:
+            write_evaluation(
+                ctx,
+                STRATEGY_TAG,
+                {
+                    PARAM_TAG_UP: False,
+                    PARAM_UPDATE_CPU: STRATEGY_CPU in enabled_strategies,
+                },
+            )
+            return
+
+    if rate < 0.90:
+        if STRATEGY_REPLICAS in enabled_strategies and current_replicas > min_replicas:
             desired_replicas = max(desired_replicas, min_replicas)
-            write_evaluation(STRATEGY_REPLICAS, {
-                'replicas': desired_replicas
-            })
-        else:
-            # write_evaluation(STRATEGY_REPLICAS, {
-            #     'replicas': current_replicas
-            # })
-            write_evaluation(STRATEGY_TAG, {
-                PARAM_TAG_UP: True
-            })
+            write_evaluation(ctx, STRATEGY_REPLICAS, {"replicas": desired_replicas})
+            return
+        if STRATEGY_CPU in enabled_strategies and current_mcpu > initial_mcpu:
+            write_evaluation(ctx, STRATEGY_CPU, {PARAM_CPU_MULTIPLIER: rate})
+            return
+        if STRATEGY_TAG in enabled_strategies:
+            write_evaluation(ctx, STRATEGY_TAG, {PARAM_TAG_UP: True})
+            return
+
+    ctx.logger.info("No adaptation selected")
 
 
-def write_evaluation(strategy, params):
-    evaluation = {
-        "strategy": strategy,
-        "parameters": params
-    }
-    logger.info(json.dumps(evaluation))
+def write_evaluation(ctx: AdaptContext, strategy, params):
+    evaluation = {"strategy": strategy, "parameters": params}
+    ctx.logger.info(json.dumps(evaluation))
     sys.stdout.write(json.dumps(evaluation))
 
 
 if __name__ == "__main__":
+    AdapterLogger("eval_main").logger.info("evaluate main")
     main(sys.stdin.read())

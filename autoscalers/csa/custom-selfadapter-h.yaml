@@ -10,7 +10,7 @@ spec:
         autoscaling.lab/adaptation: "yes"
       containers:
         - name: csa-znn
-          image: ${IMAGE}:${TAG}
+          image: registry.k8s.lab/csa-znn:h
           imagePullPolicy: Always
           resources:
             requests:

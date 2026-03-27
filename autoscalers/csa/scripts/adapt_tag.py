@@ -6,18 +6,15 @@ Outputs {"replicas": <int>, "tag": "<new_tag>"} when a change occurs.
 """
 
 import json
-import sys
 import re
+import sys
 
 import initial_data
-from adapt_base import (
-    build_context,
-    rollout_in_progress,
-    get_container_with_name,
-)
+from adapt_base import AdaptContext, format_mcpu
 
-TAGS = ["100k", "200k", "400k", "800k"]
+TAGS = ["100k", "200k", "400k", "600k", "800k"]
 PARAM_TAG_UP = "tag_up"
+PARAM_UPDATE_CPU = "update_cpu"
 
 
 def get_image_parts(image: str) -> dict[str, str | None] | None:
@@ -53,21 +50,25 @@ def get_adjacent_tag(tag: str, up: bool) -> str | None:
 
 
 def main(spec_raw: str) -> None:
-    ctx = build_context(spec_raw, logger_name="adapt_repl")
-    if ctx is None:
+    try:
+        ctx = AdaptContext(spec_raw, logger_name="adapt_tag")
+    except ValueError:
         return
 
     params = ctx.spec.get("evaluation", {}).get("parameters", {})
     if PARAM_TAG_UP not in params:
         ctx.logger.error(f"Parameters must include '{PARAM_TAG_UP}' (bool)")
         return
-    
-    if rollout_in_progress(ctx.deployment):
+    update_cpu = (
+        params.get(PARAM_UPDATE_CPU, False) if PARAM_UPDATE_CPU in params else False
+    )
+
+    if ctx.rollout_in_progress():
         ctx.logger.info("Rollout in progress, skipping deployment patch")
         sys.stdout.write(json.dumps({"result": "skip"}))
         return
 
-    container = get_container_with_name(ctx.deployment, "znn")
+    container = ctx.get_container_spec("znn")
     if container is None:
         ctx.logger.error("Container 'znn' not found in deployment")
         return None
@@ -105,7 +106,19 @@ def main(spec_raw: str) -> None:
 
     container.image = replace_image_tag(container.image, new_tag)
     ctx.logger.info(f"Adapting tag to {new_tag}")
-    ctx.logger.info(get_container_with_name(ctx.deployment, "znn").image)
+
+    if update_cpu:
+        initial_mcpu = initial_data.get_stored_cpu_limit()
+        if initial_mcpu is None:
+            initial_mcpu = ctx.get_spec_mcpu()
+            initial_data.store_cpu_limit(initial_mcpu)
+        current_mcpu = ctx.get_current_mcpu()
+        if not current_mcpu:
+            ctx.logger.info("Could not read current mcpu")
+        if current_mcpu and initial_mcpu != current_mcpu:
+            for container in ctx.deployment.spec.template.spec.containers:
+                container.resources.limits["cpu"] = format_mcpu(current_mcpu)
+
     try:
         ctx.apps.patch_namespaced_deployment(
             name=ctx.res_name, namespace=ctx.res_ns, body=ctx.deployment

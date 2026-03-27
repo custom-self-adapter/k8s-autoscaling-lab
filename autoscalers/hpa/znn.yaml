@@ -13,7 +13,7 @@ spec:
     - type: External
       external:
         metric:
-          name: znn_latency_ms_average
+          name: znn_latency_ms_p95
         target:
           type: Value
           value: 1000

@@ -145,7 +145,6 @@ class DoubleWave(LoadTestShape):
         for stage in self.stages:
             if run_time < stage["end"]:
                 tick_data = (stage["users"], stage["spawn_rate"])
-                self.logger.info(f'{int(run_time)}, {stage["users"]}, {stage["spawn_rate"]}, {self.get_current_user_count()}"')
                 return tick_data
 
         extract(

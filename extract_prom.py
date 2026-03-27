@@ -23,7 +23,7 @@ def build_queries(ns: str):
     1000 *
     histogram_quantile(
       0.95,
-      sum by (le, namespace, pod) (
+      sum by (le, namespace) (
         rate(request_duration_seconds_bucket{host="znn"}[30s])
       )
     )

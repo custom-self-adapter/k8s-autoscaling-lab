@@ -575,7 +575,7 @@
           "expr": "1000 * sum(rate(request_duration_seconds_sum{host=\"znn\"}[30s])) / sum(rate(request_duration_seconds_count{host=\"znn\"}[30s]))",
           "hide": false,
           "instant": false,
-          "legendFormat": "request duration",
+          "legendFormat": "znn_latency_avg",
           "range": true,
           "refId": "C"
         },
@@ -585,10 +585,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(nginx_ingress_controller_request_duration_seconds_sum{exported_namespace=\"default\", ingress=\"kube-znn\"}[1m])) / sum(rate(nginx_ingress_controller_request_duration_seconds_count{exported_namespace=\"default\", ingress=\"kube-znn\"}[1m])) * 1000",
+          "expr": "1000 *\n        histogram_quantile(\n          0.95,\n          sum by (le, namespace) (\n            rate(request_duration_seconds_bucket{host=\"znn\"}[30s])\n          )\n        )",
           "hide": false,
           "instant": false,
-          "legendFormat": "request duration ingress",
+          "legendFormat": "znn_latency_p95",
           "range": true,
           "refId": "B"
         },
@@ -982,5 +982,5 @@
   "timezone": "browser",
   "title": "kube-znn",
   "uid": "c7ea10d9-635b-4e67-a062-d8e8829fa6c6",
-  "version": 17
+  "version": 3
 }

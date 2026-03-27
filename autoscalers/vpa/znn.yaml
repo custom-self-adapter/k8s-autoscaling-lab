@@ -1,0 +1,28 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: znn
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kube-znn
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+    minReplicas: 1
+  resourcePolicy:
+    containerPolicies:
+      - containerName: "znn"
+        controlledResources:
+          - cpu
+        minAllowed:
+          cpu: "150m"
+        maxAllowed:
+          cpu: "1000m"
+      - containerName: "nginx"
+        controlledResources:
+          - cpu
+        minAllowed:
+          cpu: "150m"
+        maxAllowed:
+          cpu: "1000m"

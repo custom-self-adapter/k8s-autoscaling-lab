@@ -1,0 +1,26 @@
+{{- if .Values.rbacHelpers.enable }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "custom-self-adapter-operator.name" . }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ include "custom-self-adapter-operator.resourceName" (dict "suffix" "customselfadapter-viewer-role" "context" $) }}
+rules:
+- apiGroups:
+  - custom-self-adapter.net
+  resources:
+  - customselfadapters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - custom-self-adapter.net
+  resources:
+  - customselfadapters/status
+  verbs:
+  - get
+{{- end }}

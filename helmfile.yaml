@@ -2,7 +2,7 @@ repositories:
   - name: jetstack
     url: https://charts.jetstack.io
   - name: rancher
-    url: git+https://github.com/rancher/local-path-provisioner@/deploy/chart/local-path-provisioner?ref=master
+    url: git+https://github.com/rancher/local-path-provisioner@/deploy/chart/local-path-provisioner?ref=v0.0.35
   - name: ingress-nginx
     url: https://kubernetes.github.io/ingress-nginx
   - name: prometheus-community
@@ -43,7 +43,7 @@ releases:
   - name: local-path
     namespace: local-path-storage
     chart: rancher/local-path-provisioner
-    version: 0.0.34
+    version: 0.0.35
     values:
       - storageClass:
           defaultClass: true

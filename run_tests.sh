@@ -1,5 +1,5 @@
 #!/bin/bash
-# 
+#
 # Runs all the tests, consisting in the following:
 # - kube-znn:800k
 #   - 1 replica
@@ -12,9 +12,11 @@
 # - csa horizontal + tag quality
 #   - kube-znn:800k rollingUpdate maxSurge=25% & maxUnavailable=25%
 #   - kube-znn:800k rollingUpdate maxSurge=50% & maxUnavailable=50%
-#   - kube-znn:800k rollingUpdate maxSurge=75% & maxUnavailable=75%
-#   - kube-znn:800k rollingUpdate maxSurge=100% & maxUnavailable=100%
+# - vpa
+# - csa vertical + tag quality
 # sleeps for a minute between locust executions
+
+RUN_TIME=$(date +%Y%m%d%H%M)
 
 kubectl delete hpa znn
 kubectl delete csa csa-znn
@@ -24,13 +26,13 @@ kubectl delete -k kube-znn/manifests/overlay/800k/
 kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl scale deployment kube-znn --replicas 1
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_base_1 locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 
 kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl scale deployment kube-znn --replicas 5
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_base_5 locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 
 echo "####################################"
@@ -41,7 +43,7 @@ kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl scale deployment kube-znn --replicas 1
 kubectl apply -f autoscalers/hpa/znn.yaml
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_hpa_std locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 kubectl delete -f autoscalers/hpa/znn.yaml
 
@@ -53,7 +55,7 @@ kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl scale deployment kube-znn --replicas 1
 kubectl apply -f autoscalers/hpa/znn_fast.yaml
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_hpa_fast locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 kubectl delete -f autoscalers/hpa/znn_fast.yaml
 
@@ -66,7 +68,7 @@ kubectl delete -k kube-znn/manifests/overlay/800k/
 kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl apply -f autoscalers/csa/custom-selfadapter-h.yaml
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_csa_h locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 kubectl delete -f autoscalers/csa/custom-selfadapter-h.yaml
 
@@ -81,7 +83,7 @@ kubectl scale deployment kube-znn --replicas 1
 kubectl patch deployment kube-znn --type=merge -p '{"spec":{"strategy":{"rollingUpdate":{"maxUnavailable":"25%","maxSurge":"25%"}}}}'
 kubectl apply -f autoscalers/csa/custom-selfadapter-hq.yaml
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_csa_hq_25 locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 
 
@@ -91,7 +93,7 @@ echo "####################################"
 
 kubectl patch deployment kube-znn --type=merge -p '{"spec":{"strategy":{"rollingUpdate":{"maxUnavailable":"50%","maxSurge":"50%"}}}}'
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_csa_hq_50 locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 kubectl delete -f autoscalers/csa/custom-selfadapter-hq.yaml
 
@@ -105,7 +107,7 @@ kubectl delete -k kube-znn/manifests/overlay/800k/
 kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl apply -f autoscalers/vpa/znn.yaml
 sleep 30
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_vpa locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 sleep 60
 kubectl delete -f autoscalers/vpa/znn.yaml
 
@@ -118,5 +120,5 @@ kubectl delete -k kube-znn/manifests/overlay/800k/
 kubectl apply -k kube-znn/manifests/overlay/800k/
 kubectl apply -f autoscalers/csa/custom-selfadapter-vq.yaml
 sleep 5
-locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
+PROM_EXTRACT_NAME=${RUN_TIME}_csa_vq locust --headless --only-summary --processes 4 -H https://znn.k8s.lab -f tests/scenarios/locustfile.py
 kubectl delete -f autoscalers/csa/custom-selfadapter-vq.yaml

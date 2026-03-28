@@ -1,5 +1,7 @@
 import logging
 import math
+import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -18,7 +20,7 @@ def build_queries(ns: str):
     /
     sum(rate(request_duration_seconds_count{host="znn"}[30s]))
     """.strip()
-    
+
     znn_latency_ms_p95 = """
     1000 *
     histogram_quantile(
@@ -121,7 +123,15 @@ def results_to_df(result_json, series_name):
     return pd.DataFrame(rows).sort_values("ts")
 
 
-def extract(loc_user_count=None, loc_response_time=None):
+def build_csv_filename(now: datetime, scenario_name: str | None = None) -> str:
+    if scenario_name:
+        safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", scenario_name).strip("._")
+        if safe_name:
+            return f"./tests/results/{safe_name}.csv"
+    return f"./tests/results/prom_extract_{now.strftime('%Y%m%d%H%M')}.csv"
+
+
+def extract(loc_user_count=None, loc_response_time=None, scenario_name=None):
     logging.basicConfig(format="[%(asctime)s] %(name)s %(message)s", level=logging.INFO)
     ns = "default"
     window_minutes = 5
@@ -144,7 +154,9 @@ def extract(loc_user_count=None, loc_response_time=None):
         all_dfs.append(pd.DataFrame(loc_response_time).sort_values("ts"))
 
     data = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
-    csv_file = f"./tests/results/prom_extract_{now.strftime('%Y%m%d%H%M')}.csv"
+    csv_file = build_csv_filename(
+        now, scenario_name=scenario_name or os.getenv("PROM_EXTRACT_NAME")
+    )
     data.to_csv(csv_file, index=False)
     logging.info(f"Saved data to {csv_file}")
 

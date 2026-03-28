@@ -1,5 +1,5 @@
 # [MANAGER]: Manager Deployment Configurations
 manager:
   image:
-    repository: registry.k8s.lab/custom-self-adapter-operator
-    tag: v0.1.1-202603192006
+    repository: customselfadapter/custom-self-adapter-operator
+    tag: latest

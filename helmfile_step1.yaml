@@ -1,0 +1,43 @@
+repositories:
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: rancher
+    url: git+https://github.com/rancher/local-path-provisioner@/deploy/chart/local-path-provisioner?ref=v0.0.35
+  - name: metallb
+    url: https://metallb.github.io/metallb
+
+releases:
+  - name: cert-manager
+    namespace: cert-manager
+    chart: jetstack/cert-manager
+    version: 1.19.4
+    values:
+      - crds:
+          enabled: true
+          keep: false
+        nodeSelector:
+          autoscaling.lab/cert: "yes"
+        webhook:
+          nodeSelector:
+            autoscaling.lab/cert: "yes"
+        cainjector:
+          nodeSelector:
+            autoscaling.lab/cert: "yes"
+
+  - name: metallb
+    chart: metallb/metallb
+    namespace: metallb-system
+    version: 0.15.3
+    values:
+      - speaker:
+          resources:
+            limits:
+              memory: 200Mi
+
+  - name: local-path
+    namespace: local-path-storage
+    chart: rancher/local-path-provisioner
+    version: 0.0.35
+    values:
+      - storageClass:
+          defaultClass: true

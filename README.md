@@ -18,19 +18,43 @@ On the `vagrant-kubeadm-kubernetes` directory, configure the nodes on `settings.
 vagrant up
 ```
 
-On `settings.yaml`, the `custom_ca` option allows the execution of scripts that generate a root CA certificate and installs it on the nodes. This certificate will be used to sign the Ingress certificate, and should be installed on the host machine that runs the lab, so k6 can trust it.
+On `settings.yaml`, the `custom_ca` option allows the execution of scripts that generate a root CA certificate and installs it on the nodes. This certificate will be used to sign the Ingress certificate, and should be installed on the host machine that runs the lab, so k6 can trust it. On a Debian system and derivatives, you should copy the certificate to `/usr/local/share/ca-certificates/` and then run:
+
+```bash
+update-ca-certificates
+```
+
+## Connect to the cluster
+
+The cluster config file is saved under `vagrant-kubeadm-kubernetes/configs`. Add the `KUBECONFIG` env to connect to the cluster:
+
+```bash
+export KUBECONFIG=$PWD/vagrant-kubeadm-kubernetes/configs/config
+```
 
 ## Helmfile & Bootstrapping
 
-The `helmfile.yaml` file and the `bootstrapping` dir are used to deploy the base for the lab. The files in `bootstrapping` deploy components not deployed by the charts in the `helmfile.yaml`. The `cluster_bootstrap.sh` script executes the commands necessary to run the deloys.
+The `helmfile.yaml` file and the `bootstrapping` dir are used to deploy the base for the lab. The files in `bootstrapping` deploy components not deployed by the charts in the `helmfile_step1.yaml` and `helmfile_step2.yaml` files. The `cluster_bootstrap.sh` script executes the commands necessary to run the deloys.
 
 ```bash
 ./cluster_bootstrap.sh
 ```
 
-## K6 Build
+## Update /etc/hosts
 
-The script `k6-go-build.sh` uses xk6 to build k6 with the `xk6-output-prometheus-remote` plugin, that allows k6 to send its result to Prometheus.
+The registry used to store the application's image runs in the cluster's domain (k8s.lab). Their DNS entry and entries from other components should be added to the host's `/etc/hosts` file as:
+
+```
+10.0.0.15	grafana.k8s.lab prometheus.k8s.lab registry.k8s.lab znn.k8s.lab
+```
+
+Check the correct IP by running:
+
+```
+$ kubectl -n ingress-nginx get svc ingress-nginx-controller
+NAME                                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+ingress-nginx-controller             LoadBalancer   172.17.22.61    10.0.0.15     80:32521/TCP,443:31004/TCP   2d4h
+```
 
 ## Kube ZNN
 
@@ -41,3 +65,4 @@ The deploy for Kube ZNN is made via kustomize in the `kube/manifests` directory.
 ```bash
 kubectl apply -k kube-znn/manifests/overlay/800k/
 ```
+

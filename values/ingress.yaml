@@ -1,12 +1,8 @@
 controller:
   replicaCount: 2
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: autoscaling.lab/app
-            operator: DoesNotExist
+  nodeSelector:
+    kubernetes.io/os: linux
+    autoscaling.lab/ingress: "yes"
   progressDeadlineSeconds: 30
   ingressClassResource:
     name: nginx
@@ -16,10 +12,10 @@ controller:
   podAnnotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "10254"
-  resources:
-    requests:
-      cpu: 800m
-      memory: 200Mi
+  # resources:
+  #   requests:
+  #     cpu: 800m
+  #     memory: 200Mi
   metrics:
     enabled: true
     serviceMonitor:

@@ -7,6 +7,7 @@ kubectl label node node02 autoscaling.lab/db=yes
 kubectl label node node02 autoscaling.lab/adaptation=yes
 kubectl label node node02 autoscaling.lab/cert=yes
 kubectl label node node02 autoscaling.lab/ingress=yes
+kubectl label node node03 autoscaling.lab/ingress=yes
 kubectl label node node03 autoscaling.lab/registry=yes
 kubectl label node node03 autoscaling.lab/monitoring=yes
 kubectl patch -n kube-system deployments.apps metrics-server -p '{"spec": {"template": {"spec": {"nodeSelector": {"autoscaling.lab/monitoring": "yes"}}}}}'

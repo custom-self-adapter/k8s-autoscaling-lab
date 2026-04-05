@@ -1,0 +1,32 @@
+apiVersion: custom-self-adapter.net/v1
+kind: CustomSelfAdapter
+metadata:
+  namespace: default
+  name: csa-znn
+spec:
+  template:
+    spec:
+      nodeSelector:
+        autoscaling.lab/adaptation: "yes"
+      containers:
+        - name: csa-znn
+          image: registry.k8s.lab/csa-znn:v
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "128m"
+              memory: "128Mi"
+            limits:
+              cpu: "1024m"
+              memory: "1024Mi"
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kube-znn
+  roleRequiresMetricsServer: true
+  additionalRoleRules:
+    - apiGroups: [""]
+      resources: 
+        - "pods/resize"
+      verbs:
+        - "patch"

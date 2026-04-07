@@ -19,13 +19,12 @@ LOC_RESP_SIZE_COL = "loc_response_size"
 SLO_MILLISECONDS = 1000
 
 FILE_PATTERN = re.compile(
-    r"(?P<timestamp>\d{14})_(?P<order>\d+)_(?P<scenario>.+)\.csv$"
+    r"(?P<run>\d{14})_(?P<order>\d+)_(?P<scenario>.+)\.csv$"
 )
 
 SCENARIO_LABELS = {
     "base_1": "1 Replica",
     "base_5": "5 Replicas",
-    "base_100": "1 Replica 1 CPU",
     "base_1000": "1 Replica 1 CPU",
     "hpa_std": "HPA Std",
     "hpa_fast": "HPA Fast",
@@ -63,7 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Gera graficos agregados das metricas de comparacao a partir de "
-            "todos os CSVs nomeados como <timestamp>_<sequencial>_<cenario>.csv."
+            "todos os CSVs nomeados como <run>_<sequencial>_<cenario>.csv."
         )
     )
     parser.add_argument(
@@ -102,7 +101,7 @@ def discover_result_files(results_dir: Path) -> pd.DataFrame:
         rows.append(
             {
                 "file": path,
-                "timestamp": match.group("timestamp"),
+                "run": match.group("run"),
                 "order": int(match.group("order")),
                 "scenario": match.group("scenario"),
                 "label": scenario_label(match.group("scenario")),
@@ -110,9 +109,9 @@ def discover_result_files(results_dir: Path) -> pd.DataFrame:
         )
     if not rows:
         raise SystemExit(
-            f"Nenhum CSV no padrao <timestamp>_<sequencial>_<cenario>.csv foi encontrado em {results_dir}"
+            f"Nenhum CSV no padrao <run>_<sequencial>_<cenario>.csv foi encontrado em {results_dir}"
         )
-    return pd.DataFrame(rows).sort_values(["order", "timestamp", "scenario"])
+    return pd.DataFrame(rows).sort_values(["order", "run", "scenario"])
 
 
 def safe_numeric_mean(series: pd.Series) -> float:
@@ -165,7 +164,7 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
     )
 
     return {
-        "timestamp": file_info["timestamp"],
+        "run": file_info["run"],
         "order": int(file_info["order"]),
         "scenario": file_info["scenario"],
         "label": file_info["label"],
@@ -378,7 +377,7 @@ def main() -> None:
 
     discovered = discover_result_files(results_dir)
     run_rows = [compute_run_metrics(row) for _, row in discovered.iterrows()]
-    run_df = pd.DataFrame(run_rows).sort_values(["order", "timestamp", "scenario"])
+    run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "scenario"])
     summary_df = summarize_runs(run_df)
 
     summary_path.parent.mkdir(parents=True, exist_ok=True)

@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib.lines import Line2D
 
 from plot_helper import apply_standard_renames, filter_http_success, select_series
@@ -467,16 +468,7 @@ def build_plot(
     if plot_df.empty:
         raise SystemExit("Nao ha dados validos para gerar o grafico de bolhas.")
 
-    plt.style.use("bmh")
-    plt.rcParams.update(
-        {
-            "font.size": 10,
-            "axes.titlesize": 12,
-            "axes.labelsize": 10,
-            "legend.fontsize": 9,
-            "savefig.dpi": 300,
-        }
-    )
+    sns.set_theme(style="whitegrid")
 
     size_metric = plot_df["response_size_mean"]
     size_lower = float(size_metric.min())
@@ -486,25 +478,29 @@ def build_plot(
         lower=size_lower,
         upper=size_upper,
     )
-    cmap = plt.get_cmap("tab10")
-    colors = [cmap(i % cmap.N) for i in range(len(plot_df))]
+    hue_order = plot_df["label"].tolist()
+    palette_colors = sns.color_palette("tab20", n_colors=len(plot_df))
 
     fig, ax = plt.subplots(figsize=(13, 8), layout="constrained")
-    ax.scatter(
-        plot_df["resource_usage"],
-        plot_df["slo_breach_success_rate"],
-        s=bubble_sizes,
-        c=colors,
-        alpha=0.75,
-        edgecolors="#222222",
-        linewidths=1.1,
+    sns.scatterplot(
+        data=plot_df,
+        x="resource_usage",
+        y="slo_breach_success_rate",
+        hue="label",
+        hue_order=hue_order,
+        palette=palette_colors,
+        s=bubble_sizes.to_numpy(dtype=float),
+        alpha=0.8,
+        edgecolor="#222222",
+        linewidth=1.0,
+        legend=False,
+        ax=ax,
     )
 
     add_smart_labels(fig, ax, plot_df, bubble_sizes, fontsize=9)
 
     ax.set_xlabel("Uso medio de recursos (pods x kube_pod_cpu_limits)")
     ax.set_ylabel("Requisicoes acima do SLO, apenas sucesso (%)")
-    ax.grid(True, linestyle="--", alpha=0.45)
 
     ax.set_xlim(0, padded_axis_upper(plot_df["resource_usage"], minimum=1.0))
     ax.set_ylim(0, padded_axis_upper(plot_df["slo_breach_success_rate"], minimum=0.1))
@@ -549,7 +545,7 @@ def build_plot(
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, bbox_inches="tight")
+    fig.savefig(output_path, bbox_inches="tight", dpi=300)
 
 
 def main() -> None:

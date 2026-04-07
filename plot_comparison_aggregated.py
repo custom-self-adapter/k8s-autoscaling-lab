@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib.lines import Line2D
 
 from plot_helper import apply_standard_renames, filter_http_success, select_series
@@ -18,9 +19,7 @@ STATUS_CODE_COL = "loc_status_code"
 LOC_RESP_SIZE_COL = "loc_response_size"
 SLO_MILLISECONDS = 1000
 
-FILE_PATTERN = re.compile(
-    r"(?P<run>\d{14})_(?P<order>\d+)_(?P<scenario>.+)\.csv$"
-)
+FILE_PATTERN = re.compile(r"(?P<run>\d{2})_(?P<order>\d+)_(?P<scenario>.+)\.csv$")
 
 SCENARIO_LABELS = {
     "base_1": "1 Replica",
@@ -45,14 +44,14 @@ class MetricSpec:
 
 
 METRICS = [
-    MetricSpec("pods_mean", "Media de Pods (ZNN)"),
-    MetricSpec("cpu_limits_mean", "Media de kube_pod_cpu_limits"),
-    MetricSpec("response_time_mean", "Tempo medio das respostas (ms) (LOC)"),
-    MetricSpec("response_size_mean", "Tamanho medio das respostas (LOC)"),
-    MetricSpec("success_rate", "Respostas 200 (%) (LOC)", percent_axis=True),
+    MetricSpec("pods_mean", "Media de Pods (número de réplicas)"),
+    MetricSpec("cpu_limits_mean", "Média do limite de CPU (fração de CPU)"),
+    MetricSpec("response_time_mean", "Tempo medio das respostas (ms)"),
+    MetricSpec("response_size_mean", "Tamanho medio das respostas (MB)"),
+    MetricSpec("success_rate", "Respostas 200 (%)", percent_axis=True),
     MetricSpec(
         "slo_breach_success_rate",
-        "Requisicoes acima do SLO, apenas sucesso (%) (LOC)",
+        "Requisicoes acima do SLO, apenas sucesso (%)",
         percent_axis=True,
     ),
 ]
@@ -171,8 +170,10 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
         "file": str(file_info["file"]),
         "pods_mean": safe_numeric_mean(pods["value"]),
         "cpu_limits_mean": safe_numeric_mean(cpu_limits.get("value")),
-        "response_size_mean": safe_numeric_mean(resp_time.get(LOC_RESP_SIZE_COL)),
-        "response_time_mean": safe_numeric_mean(resp_time.get("value")),
+        "response_size_mean": safe_numeric_mean(
+            resp_time_success.get(LOC_RESP_SIZE_COL)
+        ),
+        "response_time_mean": safe_numeric_mean(resp_time_success.get("value")),
         "success_rate": success_rate,
         "slo_breach_rate": slo_breach_rate,
         "slo_breach_success_rate": slo_breach_success_rate,
@@ -214,20 +215,7 @@ def summarize_runs(run_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(summary_rows).sort_values(["metric", "order"])
 
 
-def build_plot(
-    summary_df: pd.DataFrame, run_df: pd.DataFrame, output_path: Path
-) -> None:
-    plt.style.use("bmh")
-    plt.rcParams.update(
-        {
-            "font.size": 10,
-            "axes.titlesize": 12,
-            "axes.labelsize": 10,
-            "legend.fontsize": 9,
-            "savefig.dpi": 300,
-        }
-    )
-
+def prepare_plot_data(run_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     scenarios = (
         run_df.groupby(["order", "scenario", "label"], as_index=False)
         .size()
@@ -235,83 +223,141 @@ def build_plot(
         .sort_values(["order", "scenario"])
         .reset_index(drop=True)
     )
-    scenario_labels = [f"{row.label}" for row in scenarios.itertuples(index=False)]
-    positions = np.arange(len(scenarios))
-    cmap = plt.get_cmap("tab10")
-    colors = [cmap(i % cmap.N) for i in positions]
+    scenario_order = scenarios["scenario"].tolist()
+    label_map = scenarios.set_index("scenario")["label"].to_dict()
+
+    plot_df = run_df.melt(
+        id_vars=["run", "order", "scenario", "label"],
+        value_vars=[metric.key for metric in METRICS],
+        var_name="metric",
+        value_name="value",
+    )
+    plot_df["value"] = pd.to_numeric(plot_df["value"], errors="coerce")
+    plot_df = plot_df.dropna(subset=["value"]).copy()
+    plot_df["scenario"] = pd.Categorical(
+        plot_df["scenario"], categories=scenario_order, ordered=True
+    )
+    plot_df["label"] = plot_df["scenario"].map(label_map)
+    return scenarios, plot_df
+
+
+def metric_upper_bound(metric_summary: pd.DataFrame, percent_axis: bool) -> float:
+    if percent_axis:
+        return 105.0
+    maxs = pd.to_numeric(metric_summary["max"], errors="coerce").to_numpy(dtype=float)
+    valid_maxs = maxs[np.isfinite(maxs)]
+    if not valid_maxs.size:
+        return 1.0
+    return max(1.0, float(valid_maxs.max()) * 1.15)
+
+
+def build_plot(
+    summary_df: pd.DataFrame, run_df: pd.DataFrame, output_path: Path
+) -> None:
+    sns.set_theme(
+        style="whitegrid",
+        context="notebook",
+        rc={
+            "axes.titlesize": 12,
+            "axes.labelsize": 10,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+            "legend.fontsize": 9,
+            "savefig.dpi": 300,
+        },
+    )
+
+    scenarios, plot_df = prepare_plot_data(run_df)
+    scenario_order = scenarios["scenario"].tolist()
+    scenario_labels = scenarios["label"].tolist()
+    palette_colors = sns.color_palette("Set2", n_colors=len(scenarios))
+    scenario_palette = {
+        scenario: palette_colors[idx] for idx, scenario in enumerate(scenario_order)
+    }
+    mean_df = (
+        plot_df.groupby(["metric", "scenario"], as_index=False, observed=False)[
+            "value"
+        ].mean()
+        if not plot_df.empty
+        else pd.DataFrame(columns=["metric", "scenario", "value"])
+    )
+    mean_df["scenario"] = pd.Categorical(
+        mean_df["scenario"], categories=scenario_order, ordered=True
+    )
 
     fig, axes = plt.subplots(3, 2, figsize=(11, 16), sharex=True, layout="constrained")
     axes = axes.flatten()
 
     for idx, metric in enumerate(METRICS):
         ax = axes[idx]
-        metric_values = []
-        plot_positions = []
-        for pos, scenario_row in enumerate(scenarios.itertuples(index=False)):
-            values = pd.to_numeric(
-                run_df.loc[
-                    (run_df["order"] == scenario_row.order)
-                    & (run_df["scenario"] == scenario_row.scenario),
-                    metric.key,
-                ],
-                errors="coerce",
-            ).dropna()
-            if values.empty:
-                continue
-            metric_values.append(values.to_numpy(dtype=float))
-            plot_positions.append(pos)
+        metric_df = plot_df[plot_df["metric"] == metric.key]
+        metric_means = mean_df[mean_df["metric"] == metric.key]
 
-        if metric_values:
-            boxplot = ax.boxplot(
-                metric_values,
-                positions=plot_positions,
-                widths=0.6,
+        if not metric_df.empty:
+            sns.boxplot(
+                data=metric_df,
+                x="scenario",
+                y="value",
+                order=scenario_order,
+                hue="scenario",
+                hue_order=scenario_order,
+                palette=scenario_palette,
+                dodge=False,
+                width=0.62,
                 whis=(0, 100),
-                showmeans=True,
-                meanprops={
-                    "marker": "o",
-                    "markerfacecolor": "white",
-                    "markeredgecolor": "black",
-                    "markersize": 6,
-                },
-                medianprops={"color": "black", "linewidth": 1.5},
-                whiskerprops={"color": "#444444", "linewidth": 1.2},
-                capprops={"color": "#444444", "linewidth": 1.2},
-                flierprops={
-                    "marker": "x",
-                    "markeredgecolor": "#666666",
-                    "markersize": 5,
-                },
-                patch_artist=True,
+                saturation=0.85,
+                linewidth=1.1,
+                fliersize=3,
+                medianprops={"color": "#1f1f1f", "linewidth": 1.6},
+                whiskerprops={"color": "#555555", "linewidth": 1.1},
+                capprops={"color": "#555555", "linewidth": 1.1},
+                boxprops={"edgecolor": "#333333"},
+                ax=ax,
             )
-            for patch, pos in zip(boxplot["boxes"], plot_positions):
-                patch.set_facecolor(colors[pos])
-                patch.set_alpha(0.75)
-                patch.set_edgecolor("#333333")
-                patch.set_linewidth(1.0)
+            sns.stripplot(
+                data=metric_df,
+                x="scenario",
+                y="value",
+                order=scenario_order,
+                color="#2f2f2f",
+                size=3.2,
+                jitter=0.18,
+                alpha=0.45,
+                ax=ax,
+            )
+            sns.scatterplot(
+                data=metric_means,
+                x="scenario",
+                y="value",
+                marker="D",
+                s=42,
+                color="white",
+                edgecolor="#111111",
+                linewidth=0.9,
+                zorder=5,
+                legend=False,
+                ax=ax,
+            )
 
         metric_summary = summary_df[summary_df["metric"] == metric.key]
-        maxs = metric_summary["max"].to_numpy(dtype=float)
-        valid_maxs = maxs[np.isfinite(maxs)]
-        if valid_maxs.size:
-            highest = float(valid_maxs.max())
-        else:
-            highest = 0.0
-
-        if metric.percent_axis:
-            ax.set_ylim(0, 105)
-        else:
-            ax.set_ylim(0, max(1.0, highest * 1.15))
+        ax.set_ylim(0, metric_upper_bound(metric_summary, metric.percent_axis))
 
         ax.set_title(metric.title)
-        ax.set_xticks(positions, scenario_labels)
-        ax.tick_params(axis="x", rotation=45)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.set_xticks(range(len(scenario_order)), scenario_labels)
+        ax.tick_params(axis="x", rotation=40)
         for tick_label in ax.get_xticklabels():
             tick_label.set_ha("right")
             tick_label.set_rotation_mode("anchor")
-        ax.grid(axis="y", linestyle="--", alpha=0.45)
+        ax.grid(axis="y", linestyle="--", alpha=0.35)
+        ax.grid(axis="x", visible=False)
 
-        if not metric_values:
+        legend = ax.get_legend()
+        if legend is not None:
+            legend.remove()
+
+        if metric_df.empty:
             ax.text(
                 0.5,
                 0.5,
@@ -328,10 +374,7 @@ def build_plot(
                 },
             )
 
-    fig.suptitle(
-        "Comparacao agregada entre cenarios de teste\n"
-        "Box = Q1-Q3, linha = mediana, circulo = media, whiskers = minimo/maximo"
-    )
+    fig.suptitle("Box = Q1-Q3, linha = mediana, pontos = execucoes, losango = media")
 
     stat_legend = [
         Line2D(
@@ -344,17 +387,19 @@ def build_plot(
         Line2D(
             [0],
             [0],
-            color="#444444",
-            linewidth=1.2,
-            marker="_",
-            markersize=10,
-            label="Min/Max",
+            color="#2f2f2f",
+            marker="o",
+            markerfacecolor="#2f2f2f",
+            linewidth=0,
+            markersize=5,
+            alpha=0.45,
+            label="Execucoes",
         ),
         Line2D(
             [0],
             [0],
-            color="black",
-            marker="o",
+            color="#111111",
+            marker="D",
             markerfacecolor="white",
             linewidth=0,
             markersize=6,

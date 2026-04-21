@@ -38,7 +38,7 @@ adapt:
 interval: 5000
 minReplicas: 1
 maxReplicas: 5
-maxCPU: 1000
+maxCPU: 750
 kubernetesMetricSpecs:
   - type: External
     external:

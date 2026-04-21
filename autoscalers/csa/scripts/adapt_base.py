@@ -20,12 +20,8 @@ import yaml
 from adapter_logger import AdapterLogger
 from kubernetes import client, config
 from kubernetes.client.models import (
-    V1Container,
     V1Deployment,
-    V1DeploymentSpec,
     V1Pod,
-    V1PodSpec,
-    V1PodTemplate,
 )
 
 

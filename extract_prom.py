@@ -74,7 +74,11 @@ def build_queries(ns: str):
     """
 
     kube_pod_cpu_limits = """
-    max(kube_pod_container_resource_limits{resource="cpu", namespace="default", container="znn"})
+    sum(
+      max by (container) (
+        kube_pod_container_resource_limits{resource="cpu", namespace="default", container=~"(znn|nginx)"}
+      )
+    )
     """
 
     return {

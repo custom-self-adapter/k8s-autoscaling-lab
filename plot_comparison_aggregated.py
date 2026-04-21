@@ -1,7 +1,4 @@
 import argparse
-import math
-import re
-from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,16 +7,12 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.lines import Line2D
 
-from plot_helper import apply_standard_renames, filter_http_success, select_series
-
-PODS_SERIES = "znn_pods_per_tag"
-CPU_LIMITS_SERIES = "kube_pod_cpu_limits"
-RESP_TIME_SERIES = "loc_response_time"
-STATUS_CODE_COL = "loc_status_code"
-LOC_RESP_SIZE_COL = "loc_response_size"
-SLO_MILLISECONDS = 1000
-
-FILE_PATTERN = re.compile(r"(?P<run>\d{2})_(?P<order>\d+)_(?P<scenario>.+)\.csv$")
+from plot_helper import (
+    MetricSpec,
+    compute_run_metrics,
+    discover_result_files,
+    summarize_runs,
+)
 
 SCENARIO_LABELS = {
     "base_1": "1 Replica",
@@ -34,14 +27,6 @@ SCENARIO_LABELS = {
     "csa_v": "CSA V",
     "csa_vq": "CSA VQ",
 }
-
-
-@dataclass(frozen=True)
-class MetricSpec:
-    key: str
-    title: str
-    percent_axis: bool = False
-
 
 METRICS = [
     MetricSpec("pods_mean", "Media de Pods (número de réplicas)"),
@@ -85,134 +70,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Abre a figura interativamente alem de salvar o arquivo.",
     )
     return parser
-
-
-def scenario_label(scenario: str) -> str:
-    return SCENARIO_LABELS.get(scenario, scenario.replace("_", " ").title())
-
-
-def discover_result_files(results_dir: Path) -> pd.DataFrame:
-    rows = []
-    for path in sorted(results_dir.glob("*.csv")):
-        match = FILE_PATTERN.fullmatch(path.name)
-        if not match:
-            continue
-        rows.append(
-            {
-                "file": path,
-                "run": match.group("run"),
-                "order": int(match.group("order")),
-                "scenario": match.group("scenario"),
-                "label": scenario_label(match.group("scenario")),
-            }
-        )
-    if not rows:
-        raise SystemExit(
-            f"Nenhum CSV no padrao <run>_<sequencial>_<cenario>.csv foi encontrado em {results_dir}"
-        )
-    return pd.DataFrame(rows).sort_values(["order", "run", "scenario"])
-
-
-def safe_numeric_mean(series: pd.Series) -> float:
-    if series is None:
-        return math.nan
-    numeric = pd.to_numeric(series, errors="coerce").dropna()
-    return float(numeric.mean()) if not numeric.empty else math.nan
-
-
-def compute_run_metrics(file_info: pd.Series) -> dict:
-    df = pd.read_csv(file_info["file"])
-    df = apply_standard_renames(df)
-
-    pods = df[df["series"] == PODS_SERIES]
-    cpu_limits = select_series(df, CPU_LIMITS_SERIES)
-    resp_time = select_series(
-        df,
-        RESP_TIME_SERIES,
-        extra_cols=[STATUS_CODE_COL, LOC_RESP_SIZE_COL],
-    )
-
-    status_source = (
-        resp_time[STATUS_CODE_COL]
-        if STATUS_CODE_COL in resp_time.columns
-        else pd.Series(dtype=float)
-    )
-    status_codes = pd.to_numeric(status_source, errors="coerce")
-    response_values = pd.to_numeric(resp_time["value"], errors="coerce")
-
-    success_mask = status_codes == 200
-    success_rate = float(success_mask.mean() * 100) if len(success_mask) else math.nan
-
-    slo_breach_mask = response_values > SLO_MILLISECONDS
-    slo_breach_rate = (
-        float(slo_breach_mask.mean() * 100) if len(slo_breach_mask) else math.nan
-    )
-
-    resp_time_success = filter_http_success(resp_time, STATUS_CODE_COL)
-    success_response_values = pd.to_numeric(
-        resp_time_success["value"]
-        if "value" in resp_time_success.columns
-        else pd.Series(dtype=float),
-        errors="coerce",
-    )
-    slo_breach_success_mask = success_response_values > SLO_MILLISECONDS
-    slo_breach_success_rate = (
-        float(slo_breach_success_mask.mean() * 100)
-        if len(slo_breach_success_mask)
-        else math.nan
-    )
-
-    return {
-        "run": file_info["run"],
-        "order": int(file_info["order"]),
-        "scenario": file_info["scenario"],
-        "label": file_info["label"],
-        "file": str(file_info["file"]),
-        "pods_mean": safe_numeric_mean(pods["value"]),
-        "cpu_limits_mean": safe_numeric_mean(cpu_limits.get("value")),
-        "response_size_mean": safe_numeric_mean(
-            resp_time_success.get(LOC_RESP_SIZE_COL)
-        ),
-        "response_time_mean": safe_numeric_mean(resp_time_success.get("value")),
-        "success_rate": success_rate,
-        "slo_breach_rate": slo_breach_rate,
-        "slo_breach_success_rate": slo_breach_success_rate,
-    }
-
-
-def summarize_runs(run_df: pd.DataFrame) -> pd.DataFrame:
-    summary_rows = []
-    scenario_cols = ["order", "scenario", "label"]
-    for scenario_info, scenario_runs in run_df.groupby(scenario_cols, sort=True):
-        order, scenario, label = scenario_info
-        for metric in METRICS:
-            values = pd.to_numeric(scenario_runs[metric.key], errors="coerce").dropna()
-            # if scenario == "base_1000" and metric.key == "cpu_limits_mean":
-            #     print(values)
-            if values.empty:
-                continue
-            summary_rows.append(
-                {
-                    "order": order,
-                    "scenario": scenario,
-                    "label": label,
-                    "metric": metric.key,
-                    "metric_title": metric.title,
-                    "runs": int(values.count()),
-                    "mean": float(values.mean()),
-                    "min": float(values.min()),
-                    "max": float(values.max()),
-                    "median": float(values.median()),
-                    "std": float(values.std(ddof=0)),
-                    "q25": float(values.quantile(0.25)),
-                    "q75": float(values.quantile(0.75)),
-                }
-            )
-    if not summary_rows:
-        raise SystemExit(
-            "Nao foi possivel calcular agregados a partir dos arquivos encontrados."
-        )
-    return pd.DataFrame(summary_rows).sort_values(["metric", "order"])
 
 
 def prepare_plot_data(run_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -420,10 +277,11 @@ def main() -> None:
     output_path = Path(args.output)
     summary_path = Path(args.summary_csv)
 
-    discovered = discover_result_files(results_dir)
+    discovered = discover_result_files(results_dir, SCENARIO_LABELS)
     run_rows = [compute_run_metrics(row) for _, row in discovered.iterrows()]
     run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "scenario"])
-    summary_df = summarize_runs(run_df)
+    summary_df = summarize_runs(run_df, METRICS, sort_columns=("metric", "order"))
+    print(summary_df[(summary_df['scenario']=='csa_hq_25') & (summary_df['metric']=='cpu_limits_mean')])
 
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_df.to_csv(summary_path, index=False)

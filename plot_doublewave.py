@@ -6,9 +6,9 @@ from pandas import pandas
 # Copied from tests/scenarios/locustfile.py
 STAGES: list[dict[str, int]] = [
     {"end": 30, "users": 20, "spawn_rate": 20},
-    {"end": 120, "users": 80, "spawn_rate": 2},
-    {"end": 200, "users": 50, "spawn_rate": 2},
-    {"end": 250, "users": 100, "spawn_rate": 10},
+    {"end": 120, "users": 100, "spawn_rate": 2},
+    {"end": 200, "users": 60, "spawn_rate": 2},
+    {"end": 250, "users": 120, "spawn_rate": 10},
     {"end": 300, "users": 20, "spawn_rate": 10},
 ]
 

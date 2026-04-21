@@ -15,14 +15,15 @@ spec:
       - containerName: "znn"
         controlledResources:
           - cpu
+        controlledValues: RequestsAndLimits
         minAllowed:
           cpu: "150m"
         maxAllowed:
-          cpu: "1000m"
+          cpu: "500m"
       - containerName: "nginx"
         controlledResources:
           - cpu
         minAllowed:
           cpu: "150m"
         maxAllowed:
-          cpu: "1000m"
+          cpu: "500m"

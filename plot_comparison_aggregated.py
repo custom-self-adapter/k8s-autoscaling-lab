@@ -281,7 +281,6 @@ def main() -> None:
     run_rows = [compute_run_metrics(row) for _, row in discovered.iterrows()]
     run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "scenario"])
     summary_df = summarize_runs(run_df, METRICS, sort_columns=("metric", "order"))
-    print(summary_df[(summary_df['scenario']=='csa_hq_25') & (summary_df['metric']=='cpu_limits_mean')])
 
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_df.to_csv(summary_path, index=False)

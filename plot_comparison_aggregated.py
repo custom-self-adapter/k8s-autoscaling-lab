@@ -7,52 +7,15 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.lines import Line2D
 
-from plot_helper import (
-    MetricSpec,
-    compute_run_metrics,
-    discover_result_files,
-    summarize_runs,
-)
-
-SCENARIO_LABELS = {
-    "base_1": "1 Replica",
-    "base_5": "5 Replicas",
-    "base_1000": "1 Replica 1 CPU",
-    "hpa_std": "HPA Std",
-    "hpa_fast": "HPA Fast",
-    "csa_h": "CSA H",
-    "csa_hq_25": "CSA HQ 25",
-    "csa_hq_50": "CSA HQ 50",
-    "vpa": "VPA",
-    "csa_v": "CSA V",
-    "csa_vq": "CSA VQ",
-}
-
-METRICS = [
-    MetricSpec("pods_mean", "Media de Pods (número de réplicas)"),
-    MetricSpec("cpu_limits_mean", "Média do limite de CPU (fração de CPU)"),
-    MetricSpec("response_time_mean", "Tempo medio das respostas (ms)"),
-    MetricSpec("response_size_mean", "Tamanho medio das respostas (MB)"),
-    MetricSpec("success_rate", "Respostas 200 (%)", percent_axis=True),
-    MetricSpec(
-        "slo_breach_success_rate",
-        "Requisicoes acima do SLO, apenas sucesso (%)",
-        percent_axis=True,
-    ),
-]
+from plot_comparison_common import COMPARISON_METRICS
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Gera graficos agregados das metricas de comparacao a partir de "
-            "todos os CSVs nomeados como <run>_<sequencial>_<cenario>.csv."
+            "Gera graficos agregados das metricas de comparacao a partir dos "
+            "CSVs compartilhados de resumo e execucoes."
         )
-    )
-    parser.add_argument(
-        "--results-dir",
-        default="tests/results",
-        help="Diretorio com os CSVs de resultados.",
     )
     parser.add_argument(
         "--output",
@@ -61,8 +24,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--summary-csv",
-        default="tests/results/compare_aggregated_summary.csv",
+        default="tests/results/compare_summary.csv",
         help="Arquivo CSV com os agregados por cenario e metrica.",
+    )
+    parser.add_argument(
+        "--runs-csv",
+        default="tests/results/compare_runs.csv",
+        help="Arquivo CSV com as metricas por execucao.",
     )
     parser.add_argument(
         "--show",
@@ -85,7 +53,7 @@ def prepare_plot_data(run_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
 
     plot_df = run_df.melt(
         id_vars=["run", "order", "scenario", "label"],
-        value_vars=[metric.key for metric in METRICS],
+        value_vars=[metric.key for metric in COMPARISON_METRICS],
         var_name="metric",
         value_name="value",
     )
@@ -145,7 +113,7 @@ def build_plot(
     fig, axes = plt.subplots(3, 2, figsize=(11, 16), sharex=True, layout="constrained")
     axes = axes.flatten()
 
-    for idx, metric in enumerate(METRICS):
+    for idx, metric in enumerate(COMPARISON_METRICS):
         ax = axes[idx]
         metric_df = plot_df[plot_df["metric"] == metric.key]
         metric_means = mean_df[mean_df["metric"] == metric.key]
@@ -273,22 +241,18 @@ def build_plot(
 
 def main() -> None:
     args = build_parser().parse_args()
-    results_dir = Path(args.results_dir)
     output_path = Path(args.output)
     summary_path = Path(args.summary_csv)
+    runs_path = Path(args.runs_csv)
 
-    discovered = discover_result_files(results_dir, SCENARIO_LABELS)
-    run_rows = [compute_run_metrics(row) for _, row in discovered.iterrows()]
-    run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "scenario"])
-    summary_df = summarize_runs(run_df, METRICS, sort_columns=("metric", "order"))
-
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_df.to_csv(summary_path, index=False)
+    summary_df = pd.read_csv(summary_path)
+    run_df = pd.read_csv(runs_path).sort_values(["order", "run", "scenario"])
     build_plot(summary_df, run_df, output_path)
 
     print(f"Arquivos analisados: {len(run_df)}")
     print(f"Grafico salvo em: {output_path}")
-    print(f"Resumo salvo em: {summary_path}")
+    print(f"Resumo lido de: {summary_path}")
+    print(f"Execucoes lidas de: {runs_path}")
 
     if args.show:
         plt.show()

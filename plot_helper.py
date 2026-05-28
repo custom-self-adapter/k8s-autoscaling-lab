@@ -80,6 +80,24 @@ def safe_numeric_mean(series: pd.Series | None) -> float:
     return float(numeric.mean()) if not numeric.empty else math.nan
 
 
+def safe_grouped_numeric_sum_mean(
+    df: DataFrame | None, group_col: str, value_col: str = "value"
+) -> float:
+    if df is None or df.empty or value_col not in df.columns:
+        return math.nan
+    if group_col not in df.columns:
+        return safe_numeric_mean(df.get(value_col))
+
+    grouped = df[[group_col, value_col]].copy()
+    grouped[value_col] = pd.to_numeric(grouped[value_col], errors="coerce")
+    grouped = grouped.dropna(subset=[group_col, value_col])
+    if grouped.empty:
+        return math.nan
+
+    summed = grouped.groupby(group_col, sort=False)[value_col].sum()
+    return float(summed.mean()) if not summed.empty else math.nan
+
+
 def select_series(df, series_name, extra_cols=None) -> DataFrame:
     cols = ["ts", "value"]
     if extra_cols:
@@ -141,7 +159,7 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
     df = pd.read_csv(file_info["file"])
     df = apply_standard_renames(df)
 
-    pods = df[df["series"] == PODS_SERIES]
+    pods = select_series(df, PODS_SERIES)
     cpu_limits = select_series(df, CPU_LIMITS_SERIES)
     resp_time = select_series(
         df,
@@ -155,15 +173,9 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
         else pd.Series(dtype=float)
     )
     status_codes = pd.to_numeric(status_source, errors="coerce")
-    response_values = pd.to_numeric(resp_time["value"], errors="coerce")
 
     success_mask = status_codes == 200
     success_rate = float(success_mask.mean() * 100) if len(success_mask) else math.nan
-
-    slo_breach_mask = response_values > SLO_MILLISECONDS
-    slo_breach_rate = (
-        float(slo_breach_mask.mean() * 100) if len(slo_breach_mask) else math.nan
-    )
 
     resp_time_success = filter_http_success(resp_time, STATUS_CODE_COL)
     success_response_values = pd.to_numeric(
@@ -185,12 +197,11 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
         "scenario": file_info["scenario"],
         "label": file_info["label"],
         "file": str(file_info["file"]),
-        "pods_mean": safe_numeric_mean(pods["value"]),
+        "pods_mean": safe_grouped_numeric_sum_mean(pods, "ts"),
         "cpu_limits_mean": safe_numeric_mean(cpu_limits.get("value")),
         "response_size_mean": safe_numeric_mean(resp_time_success.get(LOC_RESP_SIZE_COL)),
         "response_time_mean": safe_numeric_mean(resp_time_success.get("value")),
         "success_rate": success_rate,
-        "slo_breach_rate": slo_breach_rate,
         "slo_breach_success_rate": slo_breach_success_rate,
     }
 

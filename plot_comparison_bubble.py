@@ -8,57 +8,12 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.lines import Line2D
 
-from plot_helper import (
-    MetricSpec,
-    compute_run_metrics,
-    discover_result_files,
-    summarize_runs,
-)
-
-SCENARIO_LABELS = {
-    "base_1": "1x0.15",
-    "base_5": "5x0.15",
-    "base_1000": "1x1",
-    "hpa_std": "HPA Std",
-    "hpa_fast": "HPA Fast",
-    "csa_h": "CSA H",
-    "csa_hq_25": "CSA HQ 25",
-    "csa_hq_50": "CSA HQ 50",
-    "vpa": "VPA",
-    "csa_v": "CSA V",
-    "csa_vq": "CSA VQ",
-}
-
-METRICS = [
-    MetricSpec("pods_mean", "Media de Pods (ZNN)"),
-    MetricSpec("cpu_limits_mean", "Media de kube_pod_cpu_limits"),
-    MetricSpec("response_size_mean", "Tamanho medio das respostas (LOC)"),
-    MetricSpec("response_time_mean", "Tempo medio das respostas (ms) (LOC)"),
-    MetricSpec("success_rate", "Respostas 200 (%) (LOC)", percent_axis=True),
-    MetricSpec(
-        "slo_breach_rate",
-        "Requisicoes acima do SLO (%) (LOC)",
-        percent_axis=True,
-    ),
-    MetricSpec(
-        "slo_breach_success_rate",
-        "Requisicoes acima do SLO, apenas sucesso (%) (LOC)",
-        percent_axis=True,
-    ),
-]
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Gera um grafico de bolhas por cenario a partir dos CSVs nomeados "
-            "como <run>_<sequencial>_<cenario>.csv."
+            "Gera um grafico de bolhas por cenario a partir do CSV "
+            "compartilhado de resumo."
         )
-    )
-    parser.add_argument(
-        "--results-dir",
-        default="tests/results",
-        help="Diretorio com os CSVs de resultados.",
     )
     parser.add_argument(
         "--output",
@@ -67,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--summary-csv",
-        default="tests/results/compare_bubble_summary.csv",
+        default="tests/results/compare_summary.csv",
         help="Arquivo CSV com os agregados por cenario e metrica.",
     )
     parser.add_argument(
@@ -76,6 +31,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Abre a figura interativamente alem de salvar o arquivo.",
     )
     return parser
+
+
 def scale_bubble_sizes(
     values: pd.Series,
     min_size: float = 300.0,
@@ -134,9 +91,7 @@ def select_legend_size_values(values: pd.Series, count: int = 2) -> list[float]:
     return [float(finite[0]), float(finite[-1])]
 
 
-def build_plot(
-    summary_df: pd.DataFrame, run_df: pd.DataFrame, output_path: Path
-) -> None:
+def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
     required_metrics = [
         "pods_mean",
         "cpu_limits_mean",
@@ -153,13 +108,8 @@ def build_plot(
         )
         .reset_index()
     )
-    run_counts = (
-        run_df.groupby(["order", "scenario", "label"], as_index=False)
-        .size()
-        .rename(columns={"size": "run_count"})
-    )
     plot_df = (
-        run_counts.merge(plot_summary, on=["order", "scenario", "label"], how="left")
+        plot_summary
         .sort_values(["order", "scenario"])
         .dropna(subset=required_metrics)
         .reset_index(drop=True)
@@ -285,22 +235,14 @@ def build_plot(
 
 def main() -> None:
     args = build_parser().parse_args()
-    results_dir = Path(args.results_dir)
     output_path = Path(args.output)
     summary_path = Path(args.summary_csv)
 
-    discovered = discover_result_files(results_dir, SCENARIO_LABELS)
-    run_rows = [compute_run_metrics(row) for _, row in discovered.iterrows()]
-    run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "scenario"])
-    summary_df = summarize_runs(run_df, METRICS, sort_columns=("metric", "order", "scenario"))
+    summary_df = pd.read_csv(summary_path)
+    build_plot(summary_df, output_path)
 
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_df.to_csv(summary_path, index=False)
-    build_plot(summary_df, run_df, output_path)
-
-    print(f"Arquivos analisados: {len(run_df)}")
     print(f"Grafico salvo em: {output_path}")
-    print(f"Resumo salvo em: {summary_path}")
+    print(f"Resumo lido de: {summary_path}")
 
     if args.show:
         plt.show()

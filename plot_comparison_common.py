@@ -1,15 +1,14 @@
 from plot_helper import MetricSpec
 
 CONFIGURATION_LABELS = {
-    "base_1": "1 Replica",
-    "base_5": "5 Replicas",
-    "base_1000": "1 Replica 1 CPU",
+    "base_1": "Base 1 Repl",
+    "base_5": "Base 5 Repl",
     "hpa_std": "HPA Std",
     "hpa_fast": "HPA Fast",
     "csa_h": "CSA H",
     "csa_hq_25": "CSA HQ 25",
     "csa_hq_50": "CSA HQ 50",
-    "base_1500": "Base 1500",
+    "base_1500": "Base 1 Repl 1.5 CPU",
     "vpa": "VPA",
     "csa_v": "CSA V",
     "csa_vq": "CSA VQ",
@@ -27,3 +26,5 @@ COMPARISON_METRICS = [
         percent_axis=True,
     ),
 ]
+
+

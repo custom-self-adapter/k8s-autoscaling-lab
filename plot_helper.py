@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Pattern
 
+import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
@@ -25,6 +26,13 @@ class MetricSpec:
     key: str
     title: str
     percent_axis: bool = False
+
+
+@dataclass(frozen=True)
+class ParetoObjective:
+    key: str
+    minimize: bool = True
+
 
 SERIES_RENAMES = {
     "req_duration_avg_ms": "znn_req_duration_avg_ms",
@@ -98,6 +106,95 @@ def safe_grouped_numeric_sum_mean(
 
     summed = grouped.groupby(group_col, sort=False)[value_col].sum()
     return float(summed.mean()) if not summed.empty else math.nan
+
+
+def scale_bubble_sizes(
+    values: pd.Series,
+    min_size: float = 300.0,
+    max_size: float = 2600.0,
+    lower: float | None = None,
+    upper: float | None = None,
+) -> pd.Series:
+    numeric = pd.to_numeric(values, errors="coerce")
+    finite = numeric[np.isfinite(numeric)]
+    if finite.empty:
+        return pd.Series(np.full(len(numeric), min_size), index=numeric.index)
+
+    lower = float(finite.min()) if lower is None else float(lower)
+    upper = float(finite.max()) if upper is None else float(upper)
+    if upper < lower:
+        lower, upper = upper, lower
+    if math.isclose(lower, upper):
+        mid = (min_size + max_size) / 2.0
+        return pd.Series(np.full(len(numeric), mid), index=numeric.index)
+
+    scaled = min_size + (numeric - lower) * (max_size - min_size) / (upper - lower)
+    return scaled.clip(lower=min_size, upper=max_size).fillna(min_size)
+
+
+def padded_axis_upper(
+    values: pd.Series, minimum: float, multiplier: float = 1.15
+) -> float:
+    numeric = pd.to_numeric(values, errors="coerce")
+    finite = numeric[np.isfinite(numeric)]
+    if finite.empty:
+        return minimum
+    return max(minimum, float(finite.max()) * multiplier)
+
+
+def format_byte_size(value: float, precision: int = 1) -> str:
+    if value >= 1024 * 1024:
+        return f"{value / (1024 * 1024):.{precision}f} MiB"
+    if value >= 1024:
+        return f"{value / 1024:.{precision}f} KiB"
+    return f"{value:.0f} B"
+
+
+def add_resource_usage(
+    df: DataFrame,
+    pods_col: str = "pods_mean",
+    cpu_limits_col: str = "cpu_limits_mean",
+    output_col: str = "resource_usage",
+) -> DataFrame:
+    updated = df.copy()
+    updated[output_col] = pd.to_numeric(
+        updated[pods_col], errors="coerce"
+    ) * pd.to_numeric(updated[cpu_limits_col], errors="coerce")
+    return updated
+
+
+def pareto_efficient_mask(
+    df: DataFrame,
+    objectives: Sequence[ParetoObjective],
+    tolerance: float = 1e-12,
+) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=bool, index=df.index)
+    if not objectives:
+        raise ValueError("Pelo menos um objetivo de Pareto deve ser informado.")
+
+    normalized = []
+    for objective in objectives:
+        values = pd.to_numeric(df[objective.key], errors="coerce")
+        normalized.append(values if objective.minimize else -values)
+
+    matrix = pd.concat(normalized, axis=1)
+    valid = matrix.notna().all(axis=1)
+    mask = pd.Series(False, index=df.index)
+    values = matrix.loc[valid].to_numpy(dtype=float)
+    valid_index = matrix.loc[valid].index
+
+    for idx, candidate in enumerate(values):
+        others = np.delete(values, idx, axis=0)
+        if others.size == 0:
+            mask.loc[valid_index[idx]] = True
+            continue
+
+        weakly_better = np.all(others <= candidate + tolerance, axis=1)
+        strictly_better = np.any(others < candidate - tolerance, axis=1)
+        mask.loc[valid_index[idx]] = not np.any(weakly_better & strictly_better)
+
+    return mask
 
 
 def select_series(df, series_name, extra_cols=None) -> DataFrame:
@@ -181,9 +278,11 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
 
     resp_time_success = filter_http_success(resp_time, STATUS_CODE_COL)
     success_response_values = pd.to_numeric(
-        resp_time_success["value"]
-        if "value" in resp_time_success.columns
-        else pd.Series(dtype=float),
+        (
+            resp_time_success["value"]
+            if "value" in resp_time_success.columns
+            else pd.Series(dtype=float)
+        ),
         errors="coerce",
     )
     slo_breach_success_mask = success_response_values > SLO_MILLISECONDS
@@ -201,7 +300,9 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
         "file": str(file_info["file"]),
         "pods_mean": safe_grouped_numeric_sum_mean(pods, "ts"),
         "cpu_limits_mean": safe_numeric_mean(cpu_limits.get("value")),
-        "response_size_mean": safe_numeric_mean(resp_time_success.get(LOC_RESP_SIZE_COL)),
+        "response_size_mean": safe_numeric_mean(
+            resp_time_success.get(LOC_RESP_SIZE_COL)
+        ),
         "response_time_mean": safe_numeric_mean(resp_time_success.get("value")),
         "success_rate": success_rate,
         "slo_breach_success_rate": slo_breach_success_rate,

@@ -8,6 +8,9 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.lines import Line2D
 
+from plot_helper import format_byte_size, padded_axis_upper, scale_bubble_sizes
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -31,54 +34,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Abre a figura interativamente alem de salvar o arquivo.",
     )
     return parser
-
-
-def scale_bubble_sizes(
-    values: pd.Series,
-    min_size: float = 300.0,
-    max_size: float = 2600.0,
-    lower: float | None = None,
-    upper: float | None = None,
-) -> pd.Series:
-    numeric = pd.to_numeric(values, errors="coerce")
-    finite = numeric[np.isfinite(numeric)]
-    if finite.empty:
-        return pd.Series(np.full(len(numeric), min_size), index=numeric.index)
-
-    lower = float(finite.min()) if lower is None else float(lower)
-    upper = float(finite.max()) if upper is None else float(upper)
-    if upper < lower:
-        lower, upper = upper, lower
-    if math.isclose(lower, upper):
-        mid = (min_size + max_size) / 2.0
-        return pd.Series(np.full(len(numeric), mid), index=numeric.index)
-
-    scaled = min_size + (numeric - lower) * (max_size - min_size) / (upper - lower)
-    return scaled.clip(lower=min_size, upper=max_size).fillna(min_size)
-
-
-def padded_axis_upper(values: pd.Series, minimum: float, multiplier: float = 1.15) -> float:
-    numeric = pd.to_numeric(values, errors="coerce")
-    finite = numeric[np.isfinite(numeric)]
-    if finite.empty:
-        return minimum
-    return max(minimum, float(finite.max()) * multiplier)
-
-
-def format_response_size(value: float) -> str:
-    if value >= 1024 * 1024:
-        return f"{value / (1024 * 1024):.1f} MiB"
-    if value >= 1024:
-        return f"{value / 1024:.1f} KiB"
-    return f"{value:.0f} B"
-
-
-def format_response_size_legend(value: float) -> str:
-    if value >= 1024 * 1024:
-        return f"{value / (1024 * 1024):.2f} MiB"
-    if value >= 1024:
-        return f"{value / 1024:.2f} KiB"
-    return f"{value:.0f} B"
 
 
 def select_legend_size_values(values: pd.Series, count: int = 2) -> list[float]:
@@ -116,10 +71,9 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
     if plot_df.empty:
         raise SystemExit("Nao ha dados suficientes para gerar o grafico de bolhas.")
 
-    plot_df["resource_usage"] = (
-        pd.to_numeric(plot_df["pods_mean"], errors="coerce")
-        * pd.to_numeric(plot_df["cpu_limits_mean"], errors="coerce")
-    )
+    plot_df["resource_usage"] = pd.to_numeric(
+        plot_df["pods_mean"], errors="coerce"
+    ) * pd.to_numeric(plot_df["cpu_limits_mean"], errors="coerce")
     plot_df["slo_breach_success_rate"] = pd.to_numeric(
         plot_df["slo_breach_success_rate"], errors="coerce"
     )
@@ -128,7 +82,9 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
     )
     plot_df = (
         plot_df.replace([np.inf, -np.inf], np.nan)
-        .dropna(subset=["resource_usage", "slo_breach_success_rate", "response_size_mean"])
+        .dropna(
+            subset=["resource_usage", "slo_breach_success_rate", "response_size_mean"]
+        )
         .reset_index(drop=True)
     )
     if plot_df.empty:
@@ -189,7 +145,7 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
                 markeredgecolor="#222222",
                 alpha=0.45,
                 markersize=math.sqrt(marker_size),
-                label=format_response_size_legend(float(value)),
+                label=format_byte_size(float(value), precision=2),
             )
         )
     configuration_handles = [

@@ -15,7 +15,9 @@ RESP_TIME_SERIES = "loc_response_time"
 STATUS_CODE_COL = "loc_status_code"
 LOC_RESP_SIZE_COL = "loc_response_size"
 SLO_MILLISECONDS = 1000
-RESULT_FILE_PATTERN = re.compile(r"(?P<run>\d{2})_(?P<order>\d+)_(?P<scenario>.+)\.csv$")
+RESULT_FILE_PATTERN = re.compile(
+    r"(?P<run>\d{2})_(?P<order>\d+)_(?P<configuration>.+)\.csv$"
+)
 
 
 @dataclass(frozen=True)
@@ -42,13 +44,13 @@ COLUMN_RENAMES = {
 }
 
 
-def scenario_label(scenario: str, scenario_labels: Mapping[str, str]) -> str:
-    return scenario_labels.get(scenario, scenario.replace("_", " ").title())
+def configuration_label(configuration: str, configuration_labels: Mapping[str, str]) -> str:
+    return configuration_labels.get(configuration, configuration.replace("_", " ").title())
 
 
 def discover_result_files(
     results_dir: Path,
-    scenario_labels: Mapping[str, str],
+    configuration_labels: Mapping[str, str],
     file_pattern: Pattern[str] = RESULT_FILE_PATTERN,
 ) -> DataFrame:
     rows = []
@@ -56,21 +58,21 @@ def discover_result_files(
         match = file_pattern.fullmatch(path.name)
         if not match:
             continue
-        scenario = match.group("scenario")
+        configuration = match.group("configuration")
         rows.append(
             {
                 "file": path,
                 "run": match.group("run"),
                 "order": int(match.group("order")),
-                "scenario": scenario,
-                "label": scenario_label(scenario, scenario_labels),
+                "configuration": configuration,
+                "label": configuration_label(configuration, configuration_labels),
             }
         )
     if not rows:
         raise SystemExit(
             f"Nenhum CSV no padrao <run>_<sequencial>_<cenario>.csv foi encontrado em {results_dir}"
         )
-    return pd.DataFrame(rows).sort_values(["order", "run", "scenario"])
+    return pd.DataFrame(rows).sort_values(["order", "run", "configuration"])
 
 
 def safe_numeric_mean(series: pd.Series | None) -> float:
@@ -194,7 +196,7 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
     return {
         "run": file_info["run"],
         "order": int(file_info["order"]),
-        "scenario": file_info["scenario"],
+        "configuration": file_info["configuration"],
         "label": file_info["label"],
         "file": str(file_info["file"]),
         "pods_mean": safe_grouped_numeric_sum_mean(pods, "ts"),
@@ -209,20 +211,20 @@ def compute_run_metrics(file_info: pd.Series) -> dict:
 def summarize_runs(
     run_df: DataFrame,
     metrics: Sequence[MetricSpec],
-    sort_columns: Sequence[str] = ("metric", "order", "scenario"),
+    sort_columns: Sequence[str] = ("metric", "order", "configuration"),
 ) -> DataFrame:
     summary_rows = []
-    scenario_cols = ["order", "scenario", "label"]
-    for scenario_info, scenario_runs in run_df.groupby(scenario_cols, sort=True):
-        order, scenario, label = scenario_info
+    configuration_cols = ["order", "configuration", "label"]
+    for configuration_info, configuration_runs in run_df.groupby(configuration_cols, sort=True):
+        order, configuration, label = configuration_info
         for metric in metrics:
-            values = pd.to_numeric(scenario_runs[metric.key], errors="coerce").dropna()
+            values = pd.to_numeric(configuration_runs[metric.key], errors="coerce").dropna()
             if values.empty:
                 continue
             summary_rows.append(
                 {
                     "order": order,
-                    "scenario": scenario,
+                    "configuration": configuration,
                     "label": label,
                     "metric": metric.key,
                     "metric_title": metric.title,

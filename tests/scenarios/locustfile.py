@@ -9,7 +9,7 @@ from locust import HttpUser, LoadTestShape, events, task
 from extract_prom import extract
 
 CA_PATH = "./vagrant-kubeadm-kubernetes/certs/rootCA.crt"
-SCENARIO_NAME = os.getenv("PROM_EXTRACT_NAME")
+CONFIGURATION_NAME = os.getenv("PROM_EXTRACT_NAME")
 
 slo_ms = 1000
 request_logger = logging.getLogger("on_request")
@@ -152,7 +152,7 @@ class DoubleWave(LoadTestShape):
         extract(
             loc_user_count=self.user_count,
             loc_response_time=stats.get_response_time_rows(),
-            scenario_name=SCENARIO_NAME,
+            configuration_name=CONFIGURATION_NAME,
         )
         return None
 

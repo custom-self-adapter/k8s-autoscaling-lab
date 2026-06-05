@@ -74,12 +74,12 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-There's a complete suite of tests on `run_tests.sh`. This script will configure the cluster with various scenarios and run the same locust script in headless mode to generate load. The results are saved on CSV files under `tests/results`.
+There's a complete suite of tests on `run_tests.sh`. This script will configure the cluster with various configurations and run the same locust script in headless mode to generate load. The results are saved on CSV files under `tests/results`.
 
 # Result Visualization
 
 Some results can be visualized by running the `plot_*` scripts.
 
 - `plot_graphs.py` shows or saves a PNG file containing the detailed data collected by one locust run.
-- `plot_comparison.py` shows a comparison between multiple scenarios, configured by a JSON file like `comparison_p95_hpa_csa.json`.
-- `plot_comparison_aggregated.py` aggregates multiple script runs and show a comparison between each scenario, aggregated by the runs.
+- `plot_comparison.py` shows a comparison between multiple configurations, configured by a JSON file like `comparison_p95_hpa_csa.json`.
+- `plot_comparison_aggregated.py` aggregates multiple script runs and show a comparison between each configuration, aggregated by the runs.

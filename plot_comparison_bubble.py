@@ -101,7 +101,7 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
     plot_summary = (
         summary_df[summary_df["metric"].isin(required_metrics)]
         .pivot_table(
-            index=["order", "scenario", "label"],
+            index=["order", "configuration", "label"],
             columns="metric",
             values="mean",
             aggfunc="first",
@@ -109,8 +109,7 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
         .reset_index()
     )
     plot_df = (
-        plot_summary
-        .sort_values(["order", "scenario"])
+        plot_summary.sort_values(["order", "configuration"])
         .dropna(subset=required_metrics)
         .reset_index(drop=True)
     )
@@ -193,7 +192,7 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
                 label=format_response_size_legend(float(value)),
             )
         )
-    scenario_handles = [
+    configuration_handles = [
         Line2D(
             [],
             [],
@@ -207,15 +206,15 @@ def build_plot(summary_df: pd.DataFrame, output_path: Path) -> None:
         for idx, label in enumerate(hue_order)
     ]
 
-    scenario_legend = ax.legend(
-        handles=scenario_handles,
+    configuration_legend = ax.legend(
+        handles=configuration_handles,
         title="Cenarios",
         loc="upper left",
         bbox_to_anchor=(1.02, 1.0),
         borderaxespad=0.0,
         frameon=True,
     )
-    ax.add_artist(scenario_legend)
+    ax.add_artist(configuration_legend)
 
     ax.legend(
         handles=size_handles,

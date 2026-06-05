@@ -28,27 +28,27 @@ def build_item_title(attributes: dict) -> str | None:
 
 
 def build_image_name(attributes: dict) -> str:
-    scenario = attributes.get("scenario")
-    if scenario == "baseline":
+    configuration = attributes.get("configuration")
+    if configuration == "baseline":
         return f"0_baseline_{attributes['replicas']}_{attributes['quality']}.png"
-    if scenario == "hpa":
+    if configuration == "hpa":
         behavior = attributes.get("behavior", "default")
         quality = attributes.get("quality")
         if behavior == "fast_scale_down":
             return f"1_hpa_fast_{quality}.png"
         return f"1_hpa_{quality}.png"
-    if scenario == "csa":
+    if configuration == "csa":
         mode = attributes.get("mode")
         if mode == "horizontal":
             return "2_csa_h.png"
         if mode == "horizontal_quality":
             max_surge = attributes.get("maxSurgePct")
             return f"3_csa_hq_surge{max_surge}.png"
-    return f"{attributes.get('scenario', 'output')}.png"
+    return f"{attributes.get('configuration', 'output')}.png"
 
 
 def build_image_title(attributes: dict) -> str | None:
-    if attributes.get("scenario") != "baseline":
+    if attributes.get("configuration") != "baseline":
         return None
     replicas = attributes.get("replicas")
     quality = attributes.get("quality")

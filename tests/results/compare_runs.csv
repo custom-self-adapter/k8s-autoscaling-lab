@@ -1,4 +1,4 @@
-run,order,scenario,label,file,pods_mean,cpu_limits_mean,response_size_mean,response_time_mean,success_rate,slo_breach_success_rate
+run,order,configuration,label,file,pods_mean,cpu_limits_mean,response_size_mean,response_time_mean,success_rate,slo_breach_success_rate
 01,0,base_1,1 Replica,tests/results/01_0_base_1.csv,1.0,0.31967213114754106,1061195.22249911,3562.2213008882172,68.36213190557314,87.21965112139551
 01,0,base_5,5 Replicas,tests/results/01_0_base_5.csv,5.0,0.30000000000000004,1061196.824524563,603.9862272254886,100.0,17.603738428322142
 02,0,base_1,1 Replica,tests/results/02_0_base_1.csv,1.0,0.30000000000000004,1061179.5999170812,4137.9327710733905,43.675871435038474,91.12769485903814

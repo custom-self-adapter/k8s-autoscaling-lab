@@ -41,29 +41,29 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def prepare_plot_data(run_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    scenarios = (
-        run_df.groupby(["order", "scenario", "label"], as_index=False)
+    configurations = (
+        run_df.groupby(["order", "configuration", "label"], as_index=False)
         .size()
         .rename(columns={"size": "run_count"})
-        .sort_values(["order", "scenario"])
+        .sort_values(["order", "configuration"])
         .reset_index(drop=True)
     )
-    scenario_order = scenarios["scenario"].tolist()
-    label_map = scenarios.set_index("scenario")["label"].to_dict()
+    configuration_order = configurations["configuration"].tolist()
+    label_map = configurations.set_index("configuration")["label"].to_dict()
 
     plot_df = run_df.melt(
-        id_vars=["run", "order", "scenario", "label"],
+        id_vars=["run", "order", "configuration", "label"],
         value_vars=[metric.key for metric in COMPARISON_METRICS],
         var_name="metric",
         value_name="value",
     )
     plot_df["value"] = pd.to_numeric(plot_df["value"], errors="coerce")
     plot_df = plot_df.dropna(subset=["value"]).copy()
-    plot_df["scenario"] = pd.Categorical(
-        plot_df["scenario"], categories=scenario_order, ordered=True
+    plot_df["configuration"] = pd.Categorical(
+        plot_df["configuration"], categories=configuration_order, ordered=True
     )
-    plot_df["label"] = plot_df["scenario"].map(label_map)
-    return scenarios, plot_df
+    plot_df["label"] = plot_df["configuration"].map(label_map)
+    return configurations, plot_df
 
 
 def metric_upper_bound(metric_summary: pd.DataFrame, percent_axis: bool) -> float:
@@ -92,22 +92,22 @@ def build_plot(
         },
     )
 
-    scenarios, plot_df = prepare_plot_data(run_df)
-    scenario_order = scenarios["scenario"].tolist()
-    scenario_labels = scenarios["label"].tolist()
-    palette_colors = sns.color_palette("Set2", n_colors=len(scenarios))
-    scenario_palette = {
-        scenario: palette_colors[idx] for idx, scenario in enumerate(scenario_order)
+    configurations, plot_df = prepare_plot_data(run_df)
+    configuration_order = configurations["configuration"].tolist()
+    configuration_labels = configurations["label"].tolist()
+    palette_colors = sns.color_palette("Set2", n_colors=len(configurations))
+    configuration_palette = {
+        configuration: palette_colors[idx] for idx, configuration in enumerate(configuration_order)
     }
     mean_df = (
-        plot_df.groupby(["metric", "scenario"], as_index=False, observed=False)[
+        plot_df.groupby(["metric", "configuration"], as_index=False, observed=False)[
             "value"
         ].mean()
         if not plot_df.empty
-        else pd.DataFrame(columns=["metric", "scenario", "value"])
+        else pd.DataFrame(columns=["metric", "configuration", "value"])
     )
-    mean_df["scenario"] = pd.Categorical(
-        mean_df["scenario"], categories=scenario_order, ordered=True
+    mean_df["configuration"] = pd.Categorical(
+        mean_df["configuration"], categories=configuration_order, ordered=True
     )
 
     fig, axes = plt.subplots(3, 2, figsize=(11, 16), sharex=True, layout="constrained")
@@ -121,12 +121,12 @@ def build_plot(
         if not metric_df.empty:
             sns.boxplot(
                 data=metric_df,
-                x="scenario",
+                x="configuration",
                 y="value",
-                order=scenario_order,
-                hue="scenario",
-                hue_order=scenario_order,
-                palette=scenario_palette,
+                order=configuration_order,
+                hue="configuration",
+                hue_order=configuration_order,
+                palette=configuration_palette,
                 dodge=False,
                 width=0.62,
                 whis=(0, 100),
@@ -141,9 +141,9 @@ def build_plot(
             )
             sns.stripplot(
                 data=metric_df,
-                x="scenario",
+                x="configuration",
                 y="value",
-                order=scenario_order,
+                order=configuration_order,
                 color="#2f2f2f",
                 size=3.2,
                 jitter=0.18,
@@ -152,7 +152,7 @@ def build_plot(
             )
             sns.scatterplot(
                 data=metric_means,
-                x="scenario",
+                x="configuration",
                 y="value",
                 marker="D",
                 s=42,
@@ -170,7 +170,7 @@ def build_plot(
         ax.set_title(metric.title)
         ax.set_xlabel("")
         ax.set_ylabel("")
-        ax.set_xticks(range(len(scenario_order)), scenario_labels)
+        ax.set_xticks(range(len(configuration_order)), configuration_labels)
         ax.tick_params(axis="x", rotation=40)
         for tick_label in ax.get_xticklabels():
             tick_label.set_ha("right")
@@ -246,7 +246,7 @@ def main() -> None:
     runs_path = Path(args.runs_csv)
 
     summary_df = pd.read_csv(summary_path)
-    run_df = pd.read_csv(runs_path).sort_values(["order", "run", "scenario"])
+    run_df = pd.read_csv(runs_path).sort_values(["order", "run", "configuration"])
     build_plot(summary_df, run_df, output_path)
 
     print(f"Arquivos analisados: {len(run_df)}")

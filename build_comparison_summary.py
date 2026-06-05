@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from plot_comparison_common import COMPARISON_METRICS, SCENARIO_LABELS
+from plot_comparison_common import COMPARISON_METRICS, CONFIGURATION_LABELS
 from plot_helper import compute_run_metrics, discover_result_files, summarize_runs
 
 
@@ -38,9 +38,9 @@ def main() -> None:
     summary_path = Path(args.summary_csv)
     runs_path = Path(args.runs_csv)
 
-    discovered = discover_result_files(results_dir, SCENARIO_LABELS)
+    discovered = discover_result_files(results_dir, CONFIGURATION_LABELS)
     run_rows = [compute_run_metrics(row) for _, row in discovered.iterrows()]
-    run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "scenario"])
+    run_df = pd.DataFrame(run_rows).sort_values(["order", "run", "configuration"])
     summary_df = summarize_runs(run_df, COMPARISON_METRICS)
 
     summary_path.parent.mkdir(parents=True, exist_ok=True)

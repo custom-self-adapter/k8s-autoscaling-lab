@@ -191,15 +191,21 @@ curl --cacert vagrant-kubeadm-kubernetes/certs/rootCA.crt \
 
 The CSA experiment image currently starts from
 `registry.k8s.lab/custom-self-adapter:python-3-12-latest`. Build that base from
-the sibling `custom-self-adapter` repository with its Makefile, then push the
-required tag:
+the `custom-self-adapter` repository with its Makefile, then push the required
+tag. If it is not already next to the lab clone, clone it first:
 
 ```bash
-cd ../custom-self-adapter
+cd ..
+git clone git@github.com:custom-self-adapter/custom-self-adapter.git
+cd custom-self-adapter
+mkdir -p dist/linux_amd64
 make REGISTRY=registry.k8s.lab VERSION=latest
 docker push registry.k8s.lab/custom-self-adapter:python-3-12-latest
 cd ../k8s-autoscaling-lab
 ```
+
+If the runtime repository already exists as a sibling, skip the `git clone`
+line.
 
 ### ZNN application images
 
@@ -278,12 +284,31 @@ Before running the full suite, confirm:
 - the Vertical Pod Autoscaler CRD and controllers are installed.
 
 VPA is referenced by `autoscalers/vpa/znn.yaml`, but is not installed by
-`cluster_bootstrap.sh`. Install it separately or remove the VPA stage from a
-local copy of the suite. Check its availability with:
+`cluster_bootstrap.sh`. The current upstream VPA `1.7.x` supports Kubernetes
+`1.35` and its `InPlaceOrRecreate` mode. Install it before running this suite,
+following the
+[upstream installation procedure](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/installation.md):
+
+```bash
+cd ..
+git clone https://github.com/kubernetes/autoscaler.git
+cd autoscaler/vertical-pod-autoscaler
+./hack/vpa-up.sh
+cd ../../k8s-autoscaling-lab
+```
+
+The installer uses the current kubeconfig and creates cluster-scoped resources
+and three VPA components in `kube-system`. Check their availability with:
 
 ```bash
 kubectl api-resources | grep -i verticalpodautoscaler
+kubectl get crd verticalpodautoscalers.autoscaling.k8s.io
+kubectl get pods -n kube-system | grep vpa
 ```
+
+Do not run the complete `run_tests.sh` without VPA: the script has no
+`--skip-vpa` option and would still generate a `_vpa.csv` file after the
+failed `kubectl apply`, producing an invalid comparison.
 
 ### 2. Execute tests
 

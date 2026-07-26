@@ -19,7 +19,7 @@ COMPARISON_METRICS = [
     MetricSpec("cpu_limits_mean", "Média do limite de CPU (fração de CPU)"),
     MetricSpec("response_time_mean", "Tempo medio das respostas (ms)"),
     MetricSpec("response_size_mean", "Tamanho medio das respostas (bytes)"),
-    MetricSpec("success_rate", "Respostas 200 (%)", percent_axis=True),
+    MetricSpec("success_rate", "Respostas bem-sucedidas (%)", percent_axis=True),
     MetricSpec(
         "slo_breach_success_rate",
         "Requisicoes acima do SLO, apenas sucesso (%)",

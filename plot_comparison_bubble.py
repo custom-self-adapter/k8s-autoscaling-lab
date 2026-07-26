@@ -27,6 +27,10 @@ CATEGORY_BASE_COLORS = {
     "CSA": "#E45756",
     "Outros": "#777777",
 }
+AXIS_TITLE_FONT_SIZE = 16
+AXIS_TICK_FONT_SIZE = 14
+LEGEND_TITLE_FONT_SIZE = 18
+LEGEND_ITEM_FONT_SIZE = 16
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -239,9 +243,8 @@ def build_plot(plot_df: pd.DataFrame, output_path: Path) -> None:
     )
     configuration_colors = build_category_colors(plot_df)
 
-    figure_height = max(8.0, 0.42 * len(plot_df) + 4.0)
-    fig = plt.figure(figsize=(14, figure_height), layout="constrained")
-    grid = fig.add_gridspec(1, 2, width_ratios=[4.9, 1.1])
+    fig = plt.figure(figsize=(18, 10), layout="constrained")
+    grid = fig.add_gridspec(1, 2, width_ratios=[4.8, 1.2])
     ax = fig.add_subplot(grid[0, 0])
     legend_ax = fig.add_subplot(grid[0, 1])
     legend_ax.axis("off")
@@ -259,8 +262,15 @@ def build_plot(plot_df: pd.DataFrame, output_path: Path) -> None:
             zorder=4 if is_pareto else 3,
         )
 
-    ax.set_xlabel("Uso medio de recursos (pods x kube_pod_cpu_limits)")
-    ax.set_ylabel("Requisicoes acima do SLO, apenas sucesso (%)")
+    ax.set_xlabel(
+        "Uso medio de recursos (pods x kube_pod_cpu_limits)",
+        fontsize=AXIS_TITLE_FONT_SIZE,
+    )
+    ax.set_ylabel(
+        "Requisicoes acima do SLO, apenas sucesso (%)",
+        fontsize=AXIS_TITLE_FONT_SIZE,
+    )
+    ax.tick_params(axis="both", labelsize=AXIS_TICK_FONT_SIZE)
 
     ax.set_xlim(0, padded_axis_upper(plot_df["resource_usage"], minimum=1.0))
     ax.set_ylim(0, padded_axis_upper(plot_df["slo_breach_success_rate"], minimum=0.1))
@@ -282,7 +292,7 @@ def build_plot(plot_df: pd.DataFrame, output_path: Path) -> None:
             markerfacecolor=configuration_colors.loc[idx],
             markeredgecolor="#111111" if bool(row["pareto_frontier"]) else "#222222",
             markeredgewidth=3.0 if bool(row["pareto_frontier"]) else 1.0,
-            markersize=8,
+            markersize=10,
             label=row["label"],
         )
         for idx, row in legend_df.iterrows()
@@ -293,8 +303,10 @@ def build_plot(plot_df: pd.DataFrame, output_path: Path) -> None:
         loc="upper left",
         bbox_to_anchor=(0.0, 1.0),
         borderaxespad=0.0,
-        markerscale=1.4,
+        markerscale=1.6,
         frameon=True,
+        title_fontsize=LEGEND_TITLE_FONT_SIZE,
+        fontsize=LEGEND_ITEM_FONT_SIZE,
     )
     legend_ax.add_artist(configuration_legend)
 
@@ -325,12 +337,14 @@ def build_plot(plot_df: pd.DataFrame, output_path: Path) -> None:
         handles=size_handles,
         title="Tamanho medio da resposta",
         loc="upper left",
-        bbox_to_anchor=(0.0, 0.45),
+        bbox_to_anchor=(0.0, 0.53),
         borderaxespad=0.0,
         frameon=True,
         labelspacing=1.0,
         handletextpad=1.6,
         handleheight=4.6,
+        title_fontsize=LEGEND_TITLE_FONT_SIZE,
+        fontsize=LEGEND_ITEM_FONT_SIZE,
     )
     legend_ax.add_artist(size_legend)
 
@@ -344,15 +358,17 @@ def build_plot(plot_df: pd.DataFrame, output_path: Path) -> None:
                 markerfacecolor="#999999",
                 markeredgecolor="#111111",
                 markeredgewidth=3.0,
-                markersize=9,
+                markersize=18,
                 label="Fronteira Pareto",
             )
         ],
         title="Destaque",
         loc="upper left",
-        bbox_to_anchor=(0.0, 0.08),
+        bbox_to_anchor=(0.0, 0.25),
         borderaxespad=0.0,
         frameon=True,
+        title_fontsize=LEGEND_TITLE_FONT_SIZE,
+        fontsize=LEGEND_ITEM_FONT_SIZE,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

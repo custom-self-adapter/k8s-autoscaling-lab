@@ -215,7 +215,9 @@ cd ..
 Pass another repository as the first argument when not using the lab registry:
 
 ```bash
-./kube-znn/build.sh REGISTRY/znn
+cd kube-znn
+./build.sh REGISTRY/znn
+cd ..
 ```
 
 Deploy one variant and wait for both the application and database:
